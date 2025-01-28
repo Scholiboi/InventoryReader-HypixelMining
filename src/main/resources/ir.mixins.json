@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "package": "inventoryreader.ir.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "ChatMessageMixin",
+    "SlotClickMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+	}
+}

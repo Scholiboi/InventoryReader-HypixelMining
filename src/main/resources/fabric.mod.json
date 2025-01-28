@@ -1,0 +1,41 @@
+{
+	"schemaVersion": 1,
+	"id": "ir",
+	"version": "${version}",
+	"name": "InventoryReader",
+	"description": "Inventory Reader! Reads a count of items in your inventory!",
+	"authors": [
+		"Me!"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "MIT",
+	"icon": "assets/ir/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"inventoryreader.ir.InventoryReader"
+		],
+		"fabric-datagen": [
+			"inventoryreader.ir.InventoryReaderDataGenerator"
+		],
+		"client": [
+			"inventoryreader.ir.StorageViewerMod",
+			"inventoryreader.ir.InventoryReaderClient"
+		]
+	},
+	"mixins": [
+		"ir.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.16.3",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"another-mod": "*"
+	}
+}
