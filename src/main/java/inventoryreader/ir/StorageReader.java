@@ -37,7 +37,7 @@ public class StorageReader {
 
     Map<String, Map<String, Integer>> allcontainerData = new HashMap<>();
 
-    private static final String SERVER_URL = "http://localhost:5000/mod/modify-resources";
+    private static final String SERVER_URL = "http://localhost:5000/api/mod/modify-resources";
 
     public void saveContainerContents(ScreenHandler handler, String title) {
         readDataFromFile();
@@ -146,22 +146,24 @@ public class StorageReader {
             return;
         }
 
-        try {
-            HttpClient client = HttpClient.newHttpClient();
-            String jsonInputString = gson.toJson(data);
+        HttpUtil.HTTP_EXECUTOR.submit(() -> {
+            try {
+                HttpClient client = HttpClient.newHttpClient();
+                String jsonInputString = gson.toJson(data);
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(new URI(SERVER_URL))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonInputString, StandardCharsets.UTF_8))
-                    .build();
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(new URI(SERVER_URL))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(jsonInputString, StandardCharsets.UTF_8))
+                        .build();
 
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            InventoryReader.LOGGER.info("POST Response Code :: " + response.statusCode());
-//            InventoryReader.LOGGER.info("Response Body :: " + response.body());
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                InventoryReader.LOGGER.info("POST Response Code :: " + response.statusCode());
+//                InventoryReader.LOGGER.info("Response Body :: " + response.body());
 
-        } catch (Exception e) {
-            InventoryReader.LOGGER.error("Failed to send data to server", e);
-        }
+            } catch (Exception e) {
+                InventoryReader.LOGGER.error("Failed to send data to server", e);
+            }
+        });
     }
 }

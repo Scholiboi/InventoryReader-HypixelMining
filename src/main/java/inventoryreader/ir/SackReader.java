@@ -19,7 +19,7 @@ import java.util.*;
 public class SackReader {
     Map<String, Integer> sackData = new HashMap<>();
 
-    private static final String SERVER_URL = "http://localhost:5000/mod/modify-resources"; // localhost server url
+    private static final String SERVER_URL = "http://localhost:5000/api/mod/modify-resources"; // localhost server url
 
     private static final Set<String> GEMSTONE_RARITIES = new HashSet<>(Arrays.asList("Rough:", "Flawed:", "Fine:", "Flawless:", "Perfect:"));
 
@@ -106,23 +106,25 @@ public class SackReader {
     }
 
     public void sendDataToServer() {
-        try {
-            HttpClient client = HttpClient.newHttpClient();
-            String jsonInputString = gson.toJson(sackData);
+        HttpUtil.HTTP_EXECUTOR.submit(() -> {
+            try {
+                HttpClient client = HttpClient.newHttpClient();
+                String jsonInputString = gson.toJson(sackData);
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(new URI(SERVER_URL))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonInputString, StandardCharsets.UTF_8))
-                    .build();
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(new URI(SERVER_URL))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(jsonInputString, StandardCharsets.UTF_8))
+                        .build();
 
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            InventoryReader.LOGGER.info("POST Response Code :: " + response.statusCode());
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                InventoryReader.LOGGER.info("POST Response Code :: " + response.statusCode());
 //            InventoryReader.LOGGER.info("Response Body :: " + response.body());
 
-            sackData.clear();
-        } catch (Exception e) {
-            InventoryReader.LOGGER.error("Failed to send data to server", e);
-        }
+                sackData.clear();
+            } catch (Exception e) {
+                InventoryReader.LOGGER.error("Failed to send data to server", e);
+            }
+        });
     }
 }

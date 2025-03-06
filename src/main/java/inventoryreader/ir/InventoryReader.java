@@ -19,14 +19,72 @@ public class InventoryReader implements ModInitializer {
 	// It is considered best practice to use your mod id as the logger's name.
 	// That way, it's clear which mod wrote info, warnings, and errors.
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-
-	private static final String SERVER_URL = "http://localhost:5000/mod/reset";
+	private static Process serverProcess;
+	private static final String SERVER_URL = "http://localhost:5000/api/mod/reset";
 
 	@Override
 	public void onInitialize() {
 		LOGGER.info("Initializing Inventory Reader");
+		launchOrFetchExe();
 		clearAllserverData();
 		clearAlljsonData();
+	}
+
+	private void launchOrFetchExe() {
+		File exeFile = new File("hypixel_dwarven_forge-v1.0.0.exe");
+		if (!exeFile.exists()) {
+			LOGGER.info("the .exe not found; downloading...");
+			try {
+				java.net.URI downloadUri = new java.net.URI("https://github.com/Scholiboi/hypixel-forge/releases/download/v1.0.0/hypixel_dwarven_forge-v1.0.0.exe");
+				java.net.URL downloadUrl = downloadUri.toURL();
+				try (java.io.InputStream in = downloadUrl.openStream();
+					 java.io.FileOutputStream fos = new java.io.FileOutputStream(exeFile)) {
+					byte[] buffer = new byte[4096];
+					int bytesRead;
+					while ((bytesRead = in.read(buffer)) != -1) {
+						fos.write(buffer, 0, bytesRead);
+					}
+				}
+				LOGGER.info("Download complete.");
+			} catch (Exception e) {
+				LOGGER.error("Failed to download exe", e);
+				return;
+			}
+		}
+	
+		try {
+			ProcessBuilder builder = new ProcessBuilder("hypixel_dwarven_forge-v1.0.0.exe").inheritIO();
+			serverProcess = builder.start();
+			LOGGER.info("External exe started successfully.");
+		} catch (Exception e) {
+			LOGGER.error("Failed to launch exe", e);
+		}
+	}
+
+	public static void shutdownServer() {
+		if (serverProcess != null && serverProcess.isAlive()) {
+			ProcessHandle handle = serverProcess.toHandle();
+			handle.descendants().forEach(child -> {
+				child.destroy();
+				try {
+					if (!child.onExit().get(10, java.util.concurrent.TimeUnit.SECONDS).isAlive()) {
+					} else {
+						child.destroyForcibly();
+					}
+				} catch (Exception e) {
+					child.destroyForcibly();
+				}
+			});
+			serverProcess.destroy();
+			try {
+				if (!serverProcess.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)) {
+					serverProcess.destroyForcibly();
+				}
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				serverProcess.destroyForcibly();
+			}
+		}
 	}
 
 	private void clearAlljsonData(){
@@ -57,18 +115,20 @@ public class InventoryReader implements ModInitializer {
 		}
 	}
 	public void clearAllserverData(){
-		try {
-			HttpClient client = HttpClient.newHttpClient();
-			HttpRequest request = HttpRequest.newBuilder()
-					.uri(new URI(SERVER_URL))
-					.header("Content-Type", "application/json")
-					.POST(HttpRequest.BodyPublishers.noBody())
-					.build();
+		HttpUtil.HTTP_EXECUTOR.submit(() -> {
+			try {
+				HttpClient client = HttpClient.newHttpClient();
+				HttpRequest request = HttpRequest.newBuilder()
+						.uri(new URI(SERVER_URL))
+						.header("Content-Type", "application/json")
+						.POST(HttpRequest.BodyPublishers.noBody())
+						.build();
 
-			HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-			LOGGER.info("Initialization POST Response Code :: " + response.statusCode());
-		} catch (Exception e) {
-			LOGGER.error("Failed to send initialization request to server", e);
-		}
+				HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+				LOGGER.info("Initialization POST Response Code :: " + response.statusCode());
+			} catch (Exception e) {
+				LOGGER.error("Failed to send initialization request to server", e);
+			}
+		});
 	}
 }

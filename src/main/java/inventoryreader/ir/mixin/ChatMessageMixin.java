@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+
+import inventoryreader.ir.HttpUtil;
 import inventoryreader.ir.InventoryReader;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.network.packet.s2c.play.GameMessageS2CPacket;
@@ -21,6 +23,8 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -42,6 +46,9 @@ public class ChatMessageMixin {
 
     @Unique
     private static final AtomicBoolean isProcessing = new AtomicBoolean(false);
+
+    @Unique
+    private static final ExecutorService networkExecutor = Executors.newSingleThreadExecutor();
 
     @Inject(method = "onGameMessage", at = @At("HEAD"))
     private void onGameMessage(GameMessageS2CPacket packet, CallbackInfo ci) {
@@ -205,20 +212,20 @@ public class ChatMessageMixin {
 
     @Unique
     private void sendItemMapToEndpoint(Map<String, Integer> itemMap) {
-        try {
-            HttpClient client = HttpClient.newHttpClient();
-            String jsonInputString = GSON.toJson(itemMap);
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(new URI("http://localhost:5000/mod/modify-resources"))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonInputString, StandardCharsets.UTF_8))
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            InventoryReader.LOGGER.info("POST Response Code :: " + response.statusCode());
-        } catch (Exception e) {
-            InventoryReader.LOGGER.error("Error sending item map to endpoint", e);
-        }
+        HttpUtil.HTTP_EXECUTOR.submit(() -> {
+            try {
+                HttpClient client = HttpClient.newHttpClient();
+                String jsonInputString = GSON.toJson(itemMap);
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(new URI("http://localhost:5000/api/mod/modify-resources"))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(jsonInputString, StandardCharsets.UTF_8))
+                        .build();
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                InventoryReader.LOGGER.info("POST Response Code :: " + response.statusCode());
+            } catch (Exception e) {
+                InventoryReader.LOGGER.error("Error sending item map to endpoint", e);
+            }
+        });
     }
 }

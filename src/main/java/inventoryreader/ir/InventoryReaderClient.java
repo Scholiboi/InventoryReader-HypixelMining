@@ -3,6 +3,7 @@ package inventoryreader.ir;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerInventory;
@@ -26,7 +27,7 @@ public class InventoryReaderClient implements ClientModInitializer {
     private final Map<String, Integer> changesData = new HashMap<>();
     private int tickCounter = 0;
     private static final String DATA_FILE = "inventorydata.json";
-    private static final String SERVER_URL = "http://localhost:5000/mod/modify-resources";
+    private static final String SERVER_URL = "http://localhost:5000/api/mod/modify-resources";
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
@@ -44,6 +45,10 @@ public class InventoryReaderClient implements ClientModInitializer {
         });
 
         scheduler.scheduleAtFixedRate(this::sendChangesToServer, 0, 5, TimeUnit.SECONDS);
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+            HttpUtil.shutdown();
+            InventoryReader.shutdownServer();
+        });
     }
 
     private void checkInventory(MinecraftClient client) {
@@ -98,26 +103,23 @@ public class InventoryReaderClient implements ClientModInitializer {
     }
 
     private void sendChangesToServer() {
-        if (changesData.isEmpty()) {
-            return;
-        }
-        try {
-            HttpClient client = HttpClient.newHttpClient();
-            String jsonInputString = gson.toJson(changesData);
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(new URI(SERVER_URL))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonInputString, StandardCharsets.UTF_8))
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            InventoryReader.LOGGER.info("POST Response Code :: " + response.statusCode());
-
-            changesData.clear();
-        } catch (Exception e) {
-            InventoryReader.LOGGER.error("Failed to send data to server", e);
-        }
+        if (changesData.isEmpty()) return;
+        HttpUtil.HTTP_EXECUTOR.submit(() -> {
+            try {
+                HttpClient client = HttpClient.newHttpClient();
+                String jsonInputString = gson.toJson(changesData);
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(new URI(SERVER_URL))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(jsonInputString, StandardCharsets.UTF_8))
+                        .build();
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                InventoryReader.LOGGER.info("POST Response Code :: " + response.statusCode());
+                changesData.clear();
+            } catch (Exception e) {
+                InventoryReader.LOGGER.error("Failed to send data to server", e);
+            }
+        });
     }
 
     private void saveDataToFile() {
