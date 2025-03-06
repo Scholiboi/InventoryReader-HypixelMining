@@ -13,7 +13,7 @@ Inventory Reader automatically monitors your in-game inventories, containers, an
 - **Companion App Integration**: Works with a desktop application for enhanced functionality  
 
 ## Requirements
-- Minecraft 1.21.1  
+- Minecraft 1.21.1+
 - Fabric Loader 0.16.3+  
 - Java 21  
 
