@@ -12,7 +12,7 @@ import java.net.http.HttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class InventoryReader implements ModInitializer {
+public class InventoryReader implements ModInitializer{
 	public static final String MOD_ID = "ir";
 
 	// This logger is used to write text to the console and the log file.
@@ -28,14 +28,16 @@ public class InventoryReader implements ModInitializer {
 		launchOrFetchExe();
 		clearAllserverData();
 		clearAlljsonData();
+		
+		SackReader.getInstance();
 	}
 
 	private void launchOrFetchExe() {
-		File exeFile = new File("hypixel_dwarven_forge-v1.0.0.exe");
+		File exeFile = new File("hypixel_dwarven_forge-v1.1.1.exe");
 		if (!exeFile.exists()) {
 			LOGGER.info("the .exe not found; downloading...");
 			try {
-				java.net.URI downloadUri = new java.net.URI("https://github.com/Scholiboi/hypixel-forge/releases/download/v1.0.0/hypixel_dwarven_forge-v1.0.0.exe");
+				java.net.URI downloadUri = new java.net.URI("https://github.com/Scholiboi/hypixel-forge/releases/download/v1.1.1/hypixel_dwarven_forge-v1.1.1.exe");
 				java.net.URL downloadUrl = downloadUri.toURL();
 				try (java.io.InputStream in = downloadUrl.openStream();
 					 java.io.FileOutputStream fos = new java.io.FileOutputStream(exeFile)) {
@@ -53,7 +55,7 @@ public class InventoryReader implements ModInitializer {
 		}
 	
 		try {
-			ProcessBuilder builder = new ProcessBuilder("hypixel_dwarven_forge-v1.0.0.exe").inheritIO();
+			ProcessBuilder builder = new ProcessBuilder("hypixel_dwarven_forge-v1.1.1.exe").inheritIO();
 			serverProcess = builder.start();
 			LOGGER.info("External exe started successfully.");
 		} catch (Exception e) {
@@ -87,7 +89,7 @@ public class InventoryReader implements ModInitializer {
 		}
 	}
 
-	private void clearAlljsonData(){
+	public static void clearAlljsonData(){
 		String DATA_FILE_generic = "allcontainerData.json";
 		String DATA_FILE_inventory = "inventorydata.json";
 
@@ -114,7 +116,7 @@ public class InventoryReader implements ModInitializer {
 			LOGGER.error("Error while clearing json data: " + e);
 		}
 	}
-	public void clearAllserverData(){
+	public static void clearAllserverData(){
 		HttpUtil.HTTP_EXECUTOR.submit(() -> {
 			try {
 				HttpClient client = HttpClient.newHttpClient();

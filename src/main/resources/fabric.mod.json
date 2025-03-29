@@ -3,28 +3,25 @@
 	"id": "ir",
 	"version": "${version}",
 	"name": "InventoryReader",
-	"description": "Inventory Reader! Reads a count of items in your inventory!",
+	"description": "Skyblock Mining Inventory Reader! Reads a count of items in your inventory! Access at http://localhost:5000",
 	"authors": [
-		"Me!"
+		"Scholiboi"
 	],
 	"contact": {
 		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"sources": "https://github.com/Scholiboi/InventoryReader-HypixelMining"
 	},
 	"license": "MIT",
 	"icon": "assets/ir/icon.png",
 	"environment": "*",
 	"entrypoints": {
-		"main": [
-			"inventoryreader.ir.InventoryReader"
-		],
-		"fabric-datagen": [
-			"inventoryreader.ir.InventoryReaderDataGenerator"
-		],
-		"client": [
+  		"main": [
+    		"inventoryreader.ir.InventoryReader"
+  		],
+  		"client": [
 			"inventoryreader.ir.StorageViewerMod",
 			"inventoryreader.ir.InventoryReaderClient"
-		]
+  		]
 	},
 	"mixins": [
 		"ir.mixins.json"

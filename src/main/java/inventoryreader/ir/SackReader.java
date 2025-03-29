@@ -27,11 +27,36 @@ public class SackReader {
 
     List<String> sackNames = new ArrayList<>();
 
+    private static SackReader instance;
+
+    private static boolean needsReminder = false;
+
+    public static SackReader getInstance() {
+        if (instance == null) {
+            instance = new SackReader();
+        }
+        return instance;
+    }
+
+    public void clearSackNames() {
+        sackNames.clear();
+        InventoryReader.LOGGER.info("Cleared sack names list");
+    }
+
+    public static void setNeedsReminder(boolean state) {
+        needsReminder = state;
+    }
+    
+    public static boolean getNeedsReminder() {
+        return needsReminder;
+    }
+
     public void saveLoreComponents(ScreenHandler handler, String title) {
         if (sackNames.contains(title)) {
             return;
         } else {
             sackNames.add(title);
+            setNeedsReminder(false);
         }
 
         if (title.contains("Gemstone")){

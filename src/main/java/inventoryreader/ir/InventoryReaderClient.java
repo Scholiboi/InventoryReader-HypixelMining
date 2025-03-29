@@ -44,6 +44,12 @@ public class InventoryReaderClient implements ClientModInitializer {
             }
         });
 
+        IrCommandManager.registerCommands();
+		
+		ReminderManager.initialize();
+		
+		InventoryReader.LOGGER.info("Initialized Inventory Reader client components");
+        
         scheduler.scheduleAtFixedRate(this::sendChangesToServer, 0, 5, TimeUnit.SECONDS);
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             HttpUtil.shutdown();
