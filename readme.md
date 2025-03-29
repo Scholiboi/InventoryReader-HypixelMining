@@ -19,7 +19,7 @@ Inventory Reader automatically monitors your in-game inventories, containers, an
 
 ## Installation
 1. Install [Fabric Loader](https://fabricmc.net/) for Minecraft 1.21.1.  
-2. Download the latest release jar from the [Releases](https://github.com/yourusername/FabricMod_1/releases) page.  
+2. Download the latest release jar from the [Releases](https://github.com/Scholiboi/InventoryReader-HypixelMining/releases) page.  
 3. Place the jar file in your Minecraft `mods` folder.  
 4. Launch Minecraft with the Fabric profile.  
 5. On first run, the mod automatically downloads and starts the companion application.
@@ -31,7 +31,7 @@ Inventory Reader automatically monitors your in-game inventories, containers, an
 4. Data is saved to local JSON files and synchronized with the companion app.
 
 ## Files Created
-- `hypixel_dwarven_forge-v1.0.0.exe` - Companion application  
+- `hypixel_dwarven_forge-v1.1.1.exe` - Companion application  
 - `allcontainerData.json` - Storage container data  
 - `inventorydata.json` - Player inventory data  
 
@@ -48,4 +48,4 @@ This project is licensed under the terms of the [CC0 1.0 Universal License](LICE
 Created by Scholiboi  
 
 ## Support
-For questions, issues, or feature requests, please [open an issue](https://github.com/yourusername/FabricMod_1/issues) on GitHub.
+For questions, issues, or feature requests, please [open an issue](https://github.com/Scholiboi/InventoryReader-HypixelMining/issues) on GitHub.
