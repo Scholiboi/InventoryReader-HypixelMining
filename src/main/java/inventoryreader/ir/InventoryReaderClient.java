@@ -9,6 +9,9 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.ItemStack;
 
+import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URI;
@@ -89,7 +92,20 @@ public class InventoryReaderClient implements ClientModInitializer {
     }
 
     private void compareInventoryData(Map<String, Integer> newData, String title) {
-        Map<String, Integer> previousData = allInventoryData.get(title);
+        Type mapType = new TypeToken<Map<String, Map<String, Integer>>>() {}.getType();
+        Map<String, Map<String, Integer>> saveData = new HashMap<>();
+        
+        try (FileReader reader = new FileReader(DATA_FILE)) {
+            saveData = gson.fromJson(reader, mapType);
+            if (saveData == null) {
+                saveData = new HashMap<>();
+            }
+        } catch (IOException e) {
+            InventoryReader.LOGGER.error("Failed to read inventory data from file", e);
+            saveData = new HashMap<>();
+        }
+        
+        Map<String, Integer> previousData = saveData.getOrDefault(title, new HashMap<>());
 
         newData.forEach((itemName, newCount) -> {
             int previousCount = previousData.getOrDefault(itemName, 0);

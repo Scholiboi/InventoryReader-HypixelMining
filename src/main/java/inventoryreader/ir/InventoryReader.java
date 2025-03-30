@@ -25,11 +25,25 @@ public class InventoryReader implements ModInitializer{
 	@Override
 	public void onInitialize() {
 		LOGGER.info("Initializing Inventory Reader");
+		registerShutdownHook();
+
 		launchOrFetchExe();
 		clearAllserverData();
 		clearAlljsonData();
-		
-		SackReader.getInstance();
+	}
+
+	private void registerShutdownHook() {
+		LOGGER.info("Registering JVM shutdown hook");
+		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+			LOGGER.info("JVM is shutting down - cleaning up server process");
+			try {
+				HttpUtil.shutdown();
+				shutdownServer();
+				LOGGER.info("Server shutdown completed successfully");
+			} catch (Exception e) {
+				LOGGER.error("Error during server shutdown", e);
+			}
+		}));
 	}
 
 	private void launchOrFetchExe() {
@@ -116,6 +130,7 @@ public class InventoryReader implements ModInitializer{
 			LOGGER.error("Error while clearing json data: " + e);
 		}
 	}
+	
 	public static void clearAllserverData(){
 		HttpUtil.HTTP_EXECUTOR.submit(() -> {
 			try {

@@ -166,4 +166,25 @@ public class StorageReader {
             }
         });
     }
+
+    public void clearAllData() {
+        InventoryReader.LOGGER.info("Clearing all container data");
+        allcontainerData.clear();
+        changesData.clear();
+        saveDataToFile();
+        
+        try {
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(new URI(SERVER_URL))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString("{\"reset\": true}", StandardCharsets.UTF_8))
+                    .build();
+                    
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            InventoryReader.LOGGER.info("Storage reset notification sent to server, status: " + response.statusCode());
+        } catch (Exception e) {
+            InventoryReader.LOGGER.error("Failed to send storage reset notification", e);
+        }
+    }
 }

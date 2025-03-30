@@ -9,7 +9,7 @@ import net.minecraft.screen.ScreenHandler;
 public class StorageViewerMod implements ClientModInitializer{
     private static ScreenHandler lastScreenHandler = null;
     private final StorageReader storageReader = StorageReader.getInstance();
-    private final SackReader sackReader = new SackReader();
+    private final SackReader sackReader = SackReader.getInstance();
     private int tickCounter = 0;
 
     private boolean hasHandledMenuOpen = false;

@@ -7,6 +7,7 @@ import com.google.gson.JsonObject;
 
 import inventoryreader.ir.HttpUtil;
 import inventoryreader.ir.InventoryReader;
+import inventoryreader.ir.SendingManager;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.network.packet.s2c.play.GameMessageS2CPacket;
 import net.minecraft.text.Text;
@@ -212,6 +213,11 @@ public class ChatMessageMixin {
 
     @Unique
     private void sendItemMapToEndpoint(Map<String, Integer> itemMap) {
+        if (SendingManager.shouldSkipNextSend()) {
+            InventoryReader.LOGGER.info("Skipping chat data transmission after reset");
+            return;
+        }
+
         HttpUtil.HTTP_EXECUTOR.submit(() -> {
             try {
                 HttpClient client = HttpClient.newHttpClient();

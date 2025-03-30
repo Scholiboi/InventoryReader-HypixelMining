@@ -37,10 +37,25 @@ public class SackReader {
         }
         return instance;
     }
-
-    public void clearSackNames() {
+    
+    public void clearSacks() {
+        InventoryReader.LOGGER.info("Clearing all sack data");
         sackNames.clear();
-        InventoryReader.LOGGER.info("Cleared sack names list");
+        sackData.clear();
+        
+        try {
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(new URI(SERVER_URL))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString("{\"reset\": true}", StandardCharsets.UTF_8))
+                    .build();
+                    
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            InventoryReader.LOGGER.info("Sack reset notification sent to server, status: " + response.statusCode());
+        } catch (Exception e) {
+            InventoryReader.LOGGER.error("Failed to send sack reset notification", e);
+        }
     }
 
     public static void setNeedsReminder(boolean state) {
@@ -57,9 +72,11 @@ public class SackReader {
         } else {
             sackNames.add(title);
             setNeedsReminder(false);
+            
+            SendingManager.unblockDataSend();
         }
 
-        if (title.contains("Gemstone")){
+        if (title.contains("Gemstone")) {
             saveGemstoneSackData(handler);
             return;
         }

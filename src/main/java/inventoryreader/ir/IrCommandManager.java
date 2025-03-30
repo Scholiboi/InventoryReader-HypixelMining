@@ -1,6 +1,7 @@
 package inventoryreader.ir;
 
 import com.mojang.brigadier.CommandDispatcher;
+
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.*;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -33,13 +34,14 @@ public class IrCommandManager {
                 
                 .then(literal("reset")
                     .executes(context -> {
-                        SackReader.getInstance().clearSackNames();
-                        
-                        new Thread(() -> {
-                            InventoryReader.clearAllserverData();
-                            InventoryReader.clearAlljsonData();
-                        }).start();
-                        
+                        InventoryReader.LOGGER.info("Executing complete mod reset");
+
+                        SendingManager.blockNextDataSend();
+
+                        SackReader.getInstance().clearSacks();
+                        StorageReader.getInstance().clearAllData();
+                        InventoryReader.clearAllserverData();
+                        InventoryReader.clearAlljsonData();
                         SackReader.setNeedsReminder(true);
                         
                         context.getSource().sendFeedback(Text.literal("Inventory Reader data reset! ")
@@ -53,6 +55,8 @@ public class IrCommandManager {
                 .then(literal("done")
                     .executes(context -> {
                         SackReader.setNeedsReminder(false);
+
+                        SendingManager.unblockDataSend();
                         
                         context.getSource().sendFeedback(Text.literal("Acknowledged! Reminders stopped.")
                             .setStyle(Style.EMPTY.withColor(Formatting.GREEN)));
