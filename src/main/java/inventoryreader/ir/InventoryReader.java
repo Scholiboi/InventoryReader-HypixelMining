@@ -1,6 +1,7 @@
 package inventoryreader.ir;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -20,7 +21,7 @@ public class InventoryReader implements ModInitializer{
     @Override
     public void onInitialize() {
         LOGGER.info("IR Mod initializing...");
-
+        cleanupLegacyFiles();
         FilePathManager.initializeDirectories();
 
         LOGGER.info("Initializing Inventory Reader");
@@ -32,6 +33,7 @@ public class InventoryReader implements ModInitializer{
         launchOrFetchExe();
         clearAllserverData();
         clearAlljsonData();
+        cleanupLegacyFiles();
     }
 
     private void registerShutdownHook() {
@@ -130,5 +132,47 @@ public class InventoryReader implements ModInitializer{
                 LOGGER.error("Failed to send initialization request to server", e);
             }
         });
+    }
+
+    private void cleanupLegacyFiles() {
+        LOGGER.info("Cleaning up legacy files from root directory...");
+
+        File gameDir = FabricLoader.getInstance().getGameDir().toFile();
+        
+        String[] oldExeVersions = {
+            "hypixel_dwarven_forge-v1.0.0.exe",
+            "hypixel_dwarven_forge-v1.1.1.exe"
+        };
+        
+        String[] oldJsonFiles = {
+            "allcontainerData.json",
+            "inventorydata.json"
+        };
+        
+        for (String exeName : oldExeVersions) {
+            File oldExe = new File(gameDir, exeName);
+            if (oldExe.exists()) {
+                boolean deleted = oldExe.delete();
+                if (deleted) {
+                    LOGGER.info("Removed legacy executable: " + oldExe.getAbsolutePath());
+                } else {
+                    LOGGER.warn("Failed to delete legacy executable: " + oldExe.getAbsolutePath());
+                }
+            }
+        }
+
+        for (String jsonName : oldJsonFiles) {
+            File oldJson = new File(gameDir, jsonName);
+            if (oldJson.exists()) {
+                boolean deleted = oldJson.delete();
+                if (deleted) {
+                    LOGGER.info("Removed legacy JSON file: " + oldJson.getAbsolutePath());
+                } else {
+                    LOGGER.warn("Failed to delete legacy JSON file: " + oldJson.getAbsolutePath());
+                }
+            }
+        }
+        
+        LOGGER.info("Legacy file cleanup complete");
     }
 }
