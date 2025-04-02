@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 public class StorageReader {
-    private static final String DATA_FILE = "allcontainerData.json";
+    private final File DATA_FILE = FilePathManager.getInstance().getAllContainerDataFile();
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
     private static final StorageReader INSTANCE = new StorageReader();
@@ -118,11 +118,10 @@ public class StorageReader {
     }
 
     public void readDataFromFile() {
-        File file = new File(DATA_FILE);
-        if (!file.exists()) {
+        if (!DATA_FILE.exists()) {
             return;
         }
-        try (FileReader reader = new FileReader(file)) {
+        try (FileReader reader = new FileReader(DATA_FILE)) {
             Type type = new TypeToken<Map<String, Map<String, Integer>>>() {}.getType();
             Map<String, Map<String, Integer>> data = gson.fromJson(reader, type);
             if (data != null) {
@@ -134,8 +133,11 @@ public class StorageReader {
     }
 
     public void saveDataToFile() {
-        try (FileWriter writer = new FileWriter(DATA_FILE)) {
-            gson.toJson(allcontainerData, writer);
+        try {
+            DATA_FILE.getParentFile().mkdirs();
+            try (FileWriter writer = new FileWriter(DATA_FILE)) {
+                gson.toJson(allcontainerData, writer);
+            }
         } catch (IOException e) {
             InventoryReader.LOGGER.error("Failed to save data to file", e);
         }

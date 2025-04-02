@@ -11,6 +11,7 @@ import net.minecraft.item.ItemStack;
 
 import com.google.gson.reflect.TypeToken;
 import java.lang.reflect.Type;
+import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -29,7 +30,7 @@ public class InventoryReaderClient implements ClientModInitializer {
     private final Map<String, Map<String, Integer>> allInventoryData = new HashMap<>();
     private final Map<String, Integer> changesData = new HashMap<>();
     private int tickCounter = 0;
-    private static final String DATA_FILE = "inventorydata.json";
+    private final File DATA_FILE = FilePathManager.getInstance().getInventoryDataFile();
     private static final String SERVER_URL = "http://localhost:5000/api/mod/modify-resources";
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
@@ -51,7 +52,7 @@ public class InventoryReaderClient implements ClientModInitializer {
 		
 		ReminderManager.initialize();
 		
-		InventoryReader.LOGGER.info("Initialized Inventory Reader client components");
+		// InventoryReader.LOGGER.info("Initialized Inventory Reader client components");
         
         scheduler.scheduleAtFixedRate(this::sendChangesToServer, 0, 5, TimeUnit.SECONDS);
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
@@ -95,14 +96,16 @@ public class InventoryReaderClient implements ClientModInitializer {
         Type mapType = new TypeToken<Map<String, Map<String, Integer>>>() {}.getType();
         Map<String, Map<String, Integer>> saveData = new HashMap<>();
         
-        try (FileReader reader = new FileReader(DATA_FILE)) {
-            saveData = gson.fromJson(reader, mapType);
-            if (saveData == null) {
+        if (DATA_FILE.exists()) {
+            try (FileReader reader = new FileReader(DATA_FILE)) {
+                saveData = gson.fromJson(reader, mapType);
+                if (saveData == null) {
+                    saveData = new HashMap<>();
+                }
+            } catch (IOException e) {
+                InventoryReader.LOGGER.error("Failed to read inventory data from file", e);
                 saveData = new HashMap<>();
             }
-        } catch (IOException e) {
-            InventoryReader.LOGGER.error("Failed to read inventory data from file", e);
-            saveData = new HashMap<>();
         }
         
         Map<String, Integer> previousData = saveData.getOrDefault(title, new HashMap<>());
@@ -145,8 +148,12 @@ public class InventoryReaderClient implements ClientModInitializer {
     }
 
     private void saveDataToFile() {
-        try (FileWriter writer = new FileWriter(DATA_FILE)) {
-            gson.toJson(allInventoryData, writer);
+        try {
+            DATA_FILE.getParentFile().mkdirs();
+            
+            try (FileWriter writer = new FileWriter(DATA_FILE)) {
+                gson.toJson(allInventoryData, writer);
+            }
         } catch (IOException e) {
             InventoryReader.LOGGER.error("Failed to save inventory data to file", e);
         }

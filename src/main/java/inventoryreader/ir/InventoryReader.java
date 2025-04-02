@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 public class InventoryReader implements ModInitializer{
 	public static final String MOD_ID = "ir";
+	private static final String VERSION = FilePathManager.getInstance().getVersion();
 
 	// This logger is used to write text to the console and the log file.
 	// It is considered best practice to use your mod id as the logger's name.
@@ -25,8 +26,8 @@ public class InventoryReader implements ModInitializer{
 	@Override
 	public void onInitialize() {
 		LOGGER.info("Initializing Inventory Reader");
+		FilePathManager.getInstance();
 		registerShutdownHook();
-
 		launchOrFetchExe();
 		clearAllserverData();
 		clearAlljsonData();
@@ -47,33 +48,49 @@ public class InventoryReader implements ModInitializer{
 	}
 
 	private void launchOrFetchExe() {
-		File exeFile = new File("hypixel_dwarven_forge-v1.1.1.exe");
+		FilePathManager pathManager = FilePathManager.getInstance();
+		String osName = System.getProperty("os.name").toLowerCase();
+		File exeFile = pathManager.getExecutableFile();
+		String exeName = pathManager.getExecutableFileName();
+		String downloadPath = pathManager.getDownloadPath();
+		
 		if (!exeFile.exists()) {
-			LOGGER.info("the .exe not found; downloading...");
+			LOGGER.info("Executable not found for " + osName + "; downloading...");
 			try {
-				java.net.URI downloadUri = new java.net.URI("https://github.com/Scholiboi/hypixel-forge/releases/download/v1.1.1/hypixel_dwarven_forge-v1.1.1.exe");
-				java.net.URL downloadUrl = downloadUri.toURL();
-				try (java.io.InputStream in = downloadUrl.openStream();
+				String downloadUrl = "https://github.com/Scholiboi/hypixel-forge/releases/download/" + 
+									VERSION + "/hypixel_dwarven_forge-" + VERSION + "-" + downloadPath;
+				java.net.URI downloadUri = new java.net.URI(downloadUrl);
+				java.net.URL downloadUrlObj = downloadUri.toURL();
+				
+				exeFile.getParentFile().mkdirs();
+				
+				try (java.io.InputStream in = downloadUrlObj.openStream();
 					 java.io.FileOutputStream fos = new java.io.FileOutputStream(exeFile)) {
 					byte[] buffer = new byte[4096];
 					int bytesRead;
 					while ((bytesRead = in.read(buffer)) != -1) {
 						fos.write(buffer, 0, bytesRead);
 					}
+					}
+				
+				// Make the file executable on Unix-like systems
+				if (!osName.contains("win")) {
+					exeFile.setExecutable(true);
 				}
+				
 				LOGGER.info("Download complete.");
 			} catch (Exception e) {
-				LOGGER.error("Failed to download exe", e);
+				LOGGER.error("Failed to download executable", e);
 				return;
 			}
 		}
 	
 		try {
-			ProcessBuilder builder = new ProcessBuilder("hypixel_dwarven_forge-v1.1.1.exe").inheritIO();
+			ProcessBuilder builder = new ProcessBuilder(exeFile.getAbsolutePath()).inheritIO();
 			serverProcess = builder.start();
-			LOGGER.info("External exe started successfully.");
+			LOGGER.info("External executable started successfully.");
 		} catch (Exception e) {
-			LOGGER.error("Failed to launch exe", e);
+			LOGGER.error("Failed to launch executable", e);
 		}
 	}
 
@@ -103,30 +120,32 @@ public class InventoryReader implements ModInitializer{
 		}
 	}
 
-	public static void clearAlljsonData(){
-		String DATA_FILE_generic = "allcontainerData.json";
-		String DATA_FILE_inventory = "inventorydata.json";
+	public static void clearAlljsonData() {
+		FilePathManager pathManager = FilePathManager.getInstance();
+		File file_generic = pathManager.getAllContainerDataFile();
+		File file_inventory = pathManager.getInventoryDataFile();
 
-		File file_generic = new File(DATA_FILE_generic);
-		File file_inventory = new File(DATA_FILE_inventory);
-
-		try{
-			if(file_generic.exists()){
-				try(FileWriter writer = new FileWriter(DATA_FILE_generic)){
+		try {
+			if(file_generic.exists()) {
+				try(FileWriter writer = new FileWriter(file_generic)) {
 					writer.write("");
 				}
-			}else{
+			} else {
+				// Create parent directory if needed
+				file_generic.getParentFile().mkdirs();
 				file_generic.createNewFile();
 			}
 
-			if (file_inventory.exists()){
-				try(FileWriter writer = new FileWriter(DATA_FILE_inventory)){
+			if(file_inventory.exists()) {
+				try(FileWriter writer = new FileWriter(file_inventory)) {
 					writer.write("");
 				}
-			}else{
+			} else {
+				// Create parent directory if needed
+				file_inventory.getParentFile().mkdirs();
 				file_inventory.createNewFile();
 			}
-		}catch(Exception e){
+		} catch(Exception e) {
 			LOGGER.error("Error while clearing json data: " + e);
 		}
 	}
