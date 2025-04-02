@@ -77,11 +77,10 @@ public class ChatMessageMixin {
                 matchFound = true;
                 InventoryReader.LOGGER.info("Match found: " + messageString);
 
-                // Convert the Text object to a JSON string using Gson
+
                 String jsonString = GSON.toJson(text);
                 // InventoryReader.LOGGER.info("Chat Message JSON: " + jsonString);
 
-                // Parse the JSON and extract item details
                 JsonObject jsonObject = GSON.fromJson(jsonString, JsonObject.class);
                 JsonArray rootArray = jsonObject.getAsJsonArray("field_39006");
                 

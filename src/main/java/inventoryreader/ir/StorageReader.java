@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 public class StorageReader {
-    private static final String DATA_FILE = "allcontainerData.json";
+    private static final File DATA_FILE = new File(FilePathManager.DATA_DIR, "allcontainerData.json");
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
     private static final StorageReader INSTANCE = new StorageReader();
@@ -108,7 +108,6 @@ public class StorageReader {
             }
         }
 
-        // Remove items not present or with zero count
         previousData.entrySet().removeIf(entry -> !newData.containsKey(entry.getKey()) || entry.getValue() == 0);
 
         allcontainerData.put(title, previousData);
@@ -118,11 +117,10 @@ public class StorageReader {
     }
 
     public void readDataFromFile() {
-        File file = new File(DATA_FILE);
-        if (!file.exists()) {
+        if (!DATA_FILE.exists()) {
             return;
         }
-        try (FileReader reader = new FileReader(file)) {
+        try (FileReader reader = new FileReader(DATA_FILE)) {
             Type type = new TypeToken<Map<String, Map<String, Integer>>>() {}.getType();
             Map<String, Map<String, Integer>> data = gson.fromJson(reader, type);
             if (data != null) {

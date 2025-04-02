@@ -11,6 +11,7 @@ import net.minecraft.item.ItemStack;
 
 import com.google.gson.reflect.TypeToken;
 import java.lang.reflect.Type;
+import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -29,13 +30,19 @@ public class InventoryReaderClient implements ClientModInitializer {
     private final Map<String, Map<String, Integer>> allInventoryData = new HashMap<>();
     private final Map<String, Integer> changesData = new HashMap<>();
     private int tickCounter = 0;
-    private static final String DATA_FILE = "inventorydata.json";
+    private static final File DATA_FILE = new File(FilePathManager.DATA_DIR, "inventorydata.json");
     private static final String SERVER_URL = "http://localhost:5000/api/mod/modify-resources";
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     @Override
     public void onInitializeClient() {
+        ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
+            client.execute(() -> {
+                client.setScreen(new ExeDownloadScreen());
+            });
+        });
+        
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.player != null && client.world != null) {
                 if (tickCounter >= 1) {
