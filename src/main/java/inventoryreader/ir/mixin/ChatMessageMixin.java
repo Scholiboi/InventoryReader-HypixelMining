@@ -212,6 +212,10 @@ public class ChatMessageMixin {
 
     @Unique
     private void sendItemMapToEndpoint(Map<String, Integer> itemMap) {
+        if (!InventoryReader.serverRunning.get()) {
+            return;
+        }
+        
         if (SendingManager.shouldSkipNextSend()) {
             InventoryReader.LOGGER.info("Skipping chat data transmission after reset");
             return;

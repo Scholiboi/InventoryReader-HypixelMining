@@ -132,6 +132,10 @@ public class InventoryReaderClient implements ClientModInitializer {
     }
 
     private void sendChangesToServer() {
+        if (!InventoryReader.serverRunning.get()) {
+            return;
+        }
+        
         if (changesData.isEmpty()) return;
         HttpUtil.HTTP_EXECUTOR.submit(() -> {
             try {

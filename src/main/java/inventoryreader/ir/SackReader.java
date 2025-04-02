@@ -148,6 +148,9 @@ public class SackReader {
     }
 
     public void sendDataToServer() {
+        if (!InventoryReader.serverRunning.get())
+            return;
+            
         HttpUtil.HTTP_EXECUTOR.submit(() -> {
             try {
                 HttpClient client = HttpClient.newHttpClient();

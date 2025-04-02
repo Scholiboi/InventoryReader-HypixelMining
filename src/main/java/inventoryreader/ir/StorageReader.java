@@ -143,7 +143,9 @@ public class StorageReader {
         if (data.isEmpty()) {
             return;
         }
-
+        if (!InventoryReader.serverRunning.get()) {
+            return;
+        }
         HttpUtil.HTTP_EXECUTOR.submit(() -> {
             try {
                 HttpClient client = HttpClient.newHttpClient();
@@ -166,6 +168,10 @@ public class StorageReader {
     }
 
     public void clearAllData() {
+        if (!InventoryReader.serverRunning.get()) {
+            return;
+        }
+        
         InventoryReader.LOGGER.info("Clearing all container data");
         allcontainerData.clear();
         changesData.clear();

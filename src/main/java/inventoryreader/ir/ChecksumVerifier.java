@@ -19,7 +19,7 @@ public class ChecksumVerifier {
     
     // Hardcoded values for the executable and its expected checksum
     public static final String EXE_FILENAME = "hypixel_dwarven_forge-v1.1.2.exe";
-    public static final String EXPECTED_CHECKSUM = "623f5acf0d1811cb5e93d038ade4c50df13011551aa14ab5526ee64d04ab9c9e";
+    public static final String EXPECTED_CHECKSUM = "8df62946105d4e980da5ddaac158968452ef02b4be5ed9a309b1dc085bbef8cf";
 
     //use paths from FilePathManager
     public static boolean verify(File file) {

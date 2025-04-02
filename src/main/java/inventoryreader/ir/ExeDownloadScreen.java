@@ -4,6 +4,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
+import net.minecraft.util.Util;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -13,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ExeDownloadScreen extends Screen {
     private enum State {
@@ -21,10 +23,12 @@ public class ExeDownloadScreen extends Screen {
     
     private State currentState = State.INITIAL;
     private final AtomicInteger progress = new AtomicInteger(0);
+    private final AtomicBoolean cancelled = new AtomicBoolean(false);
     private CompletableFuture<Void> downloadFuture;
     private ButtonWidget okButton;
     private boolean needsDownload = false;
     private String cachedFileSize = "Calculating...";
+    private int lastMouseButtonClicked = -1;
 
     public ExeDownloadScreen() {
         super(Text.of("IR Mod Setup"));
@@ -86,14 +90,27 @@ public class ExeDownloadScreen extends Screen {
                       currentState == State.COMPLETE) {
                 this.close();
             }
-        }).dimensions(this.width / 2 - 100, this.height - 40, 200, 20).build();
+        }).dimensions(this.width / 2 - 102, this.height - 40, 100, 20).build();
+        
+        ButtonWidget cancelButton = ButtonWidget.builder(Text.of("Cancel"), button -> {
+            if (downloadFuture != null) {
+                downloadFuture.cancel(true);
+            }
+            File tempFile = new File(FilePathManager.MOD_DIR, ChecksumVerifier.EXE_FILENAME);
+            if (tempFile.exists() && currentState == State.DOWNLOADING) {
+                tempFile.delete();
+            }
+            this.close();
+        }).dimensions(this.width / 2 + 2, this.height - 40, 100, 20).build();
         
         this.addDrawableChild(okButton);
+        this.addDrawableChild(cancelButton);
     }
 
     private void startDownload() {
         currentState = State.DOWNLOADING;
         okButton.active = false;
+        cancelled.set(false);
         
         downloadFuture = CompletableFuture.runAsync(() -> {
             try {
@@ -110,6 +127,12 @@ public class ExeDownloadScreen extends Screen {
                     byte[] buffer = new byte[8192];
                     int bytesRead;
                     while ((bytesRead = in.read(buffer)) != -1) {
+                        if (Thread.currentThread().isInterrupted() || cancelled.get()) {
+                            InventoryReader.LOGGER.info("Download cancelled by user");
+                            tempFile.delete();
+                            return;
+                        }
+                        
                         fos.write(buffer, 0, bytesRead);
                         downloadedBytes += bytesRead;
                         progress.set((int)((downloadedBytes * 100) / totalBytes));
@@ -134,8 +157,12 @@ public class ExeDownloadScreen extends Screen {
                 
                 currentState = State.DOWNLOAD_COMPLETE;
             } catch (Exception e) {
-                InventoryReader.LOGGER.error("Download failed", e);
-                currentState = State.VERIFICATION_FAILED;
+                if (e instanceof InterruptedException || Thread.currentThread().isInterrupted()) {
+                    InventoryReader.LOGGER.info("Download cancelled");
+                } else {
+                    InventoryReader.LOGGER.error("Download failed", e);
+                    currentState = State.VERIFICATION_FAILED;
+                }
             }
         });
     }
@@ -150,6 +177,24 @@ public class ExeDownloadScreen extends Screen {
                 context.drawCenteredTextWithShadow(this.textRenderer, ChecksumVerifier.EXE_FILENAME, this.width / 2, 70, 0x00FFFF);
                 context.drawCenteredTextWithShadow(this.textRenderer, "File size: ~" + estimateFileSize() + " MB", this.width / 2, 90, 0xDDDDDD);
                 context.drawCenteredTextWithShadow(this.textRenderer, "Press OK to continue.", this.width / 2, 120, 0xFFFFFF);
+                
+                String githubLink = "https://github.com/Scholiboi/hypixel-forge";
+                int linkWidth = this.textRenderer.getWidth(githubLink);
+                int linkX = this.width / 2 - linkWidth / 2;
+                int linkY = this.height - 70;
+                
+                context.drawTextWithShadow(this.textRenderer, "Source code available at:", this.width / 2 - 80, linkY - 15, 0xAAAAAA);
+                context.drawTextWithShadow(this.textRenderer, githubLink, linkX, linkY, 0x55AAFF);
+                
+                if (mouseX >= linkX && mouseX <= linkX + linkWidth && 
+                    mouseY >= linkY && mouseY <= linkY + 9 && this.lastMouseButtonClicked == 0) {
+                    this.lastMouseButtonClicked = -1;
+                    try {
+                        Util.getOperatingSystem().open(new URI(githubLink));
+                    } catch (Exception e) {
+                        InventoryReader.LOGGER.error("Failed to open GitHub link", e);
+                    }
+                }
                 break;
                 
             case DOWNLOADING:
@@ -200,5 +245,11 @@ public class ExeDownloadScreen extends Screen {
     
     private String estimateFileSize() {
         return cachedFileSize;
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        this.lastMouseButtonClicked = button;
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 }

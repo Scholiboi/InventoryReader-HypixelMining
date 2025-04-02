@@ -9,12 +9,15 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class InventoryReader implements ModInitializer{
     public static final String MOD_ID = "ir";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+    public static final AtomicBoolean serverRunning = new AtomicBoolean(false);
     private static Process serverProcess;
     private static final String SERVER_URL = "http://localhost:5000/api/mod/reset";
 
@@ -57,6 +60,7 @@ public class InventoryReader implements ModInitializer{
                 ProcessBuilder builder = new ProcessBuilder(exeFile.getAbsolutePath());
                 builder.redirectError(ProcessBuilder.Redirect.INHERIT);
                 serverProcess = builder.start();
+                serverRunning.set(true);
             } else {
                 LOGGER.warn("Executable not found. The GUI will handle downloading it.");
             }
@@ -117,6 +121,10 @@ public class InventoryReader implements ModInitializer{
     }
     
     public static void clearAllserverData(){
+        if (!serverRunning.get()) {
+            LOGGER.warn("Server is not running. Skipping data clearing.");
+            return;
+        }
         HttpUtil.HTTP_EXECUTOR.submit(() -> {
             try {
                 HttpClient client = HttpClient.newHttpClient();
