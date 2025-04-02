@@ -143,44 +143,40 @@ public class InventoryReader implements ModInitializer{
     }
 
     private void cleanupLegacyFiles() {
-        LOGGER.info("Cleaning up legacy files from root directory...");
+        LOGGER.info("Cleaning up legacy files...");
 
         File gameDir = FabricLoader.getInstance().getGameDir().toFile();
+        File modDir = FilePathManager.MOD_DIR;
         
         String[] oldExeVersions = {
             "hypixel_dwarven_forge-v1.0.0.exe",
+            "hypixel_dwarven_forge-v1.1.0.exe",
             "hypixel_dwarven_forge-v1.1.1.exe"
         };
-        
+    
         String[] oldJsonFiles = {
             "allcontainerData.json",
             "inventorydata.json"
         };
-        
+
         for (String exeName : oldExeVersions) {
-            File oldExe = new File(gameDir, exeName);
-            if (oldExe.exists()) {
-                boolean deleted = oldExe.delete();
-                if (deleted) {
-                    LOGGER.info("Removed legacy executable: " + oldExe.getAbsolutePath());
-                } else {
-                    LOGGER.warn("Failed to delete legacy executable: " + oldExe.getAbsolutePath());
-                }
-            }
+            cleanupFile(new File(gameDir, exeName));
+        }
+    
+        for (String jsonName : oldJsonFiles) {
+            cleanupFile(new File(gameDir, jsonName));
         }
 
-        for (String jsonName : oldJsonFiles) {
-            File oldJson = new File(gameDir, jsonName);
-            if (oldJson.exists()) {
-                boolean deleted = oldJson.delete();
-                if (deleted) {
-                    LOGGER.info("Removed legacy JSON file: " + oldJson.getAbsolutePath());
-                } else {
-                    LOGGER.warn("Failed to delete legacy JSON file: " + oldJson.getAbsolutePath());
-                }
-            }
+        for (String exeName : oldExeVersions) {
+            cleanupFile(new File(modDir, exeName));
         }
         
         LOGGER.info("Legacy file cleanup complete");
+    }
+    
+    private void cleanupFile(File file) {
+        if (file.exists()) {
+            file.delete();
+        }
     }
 }

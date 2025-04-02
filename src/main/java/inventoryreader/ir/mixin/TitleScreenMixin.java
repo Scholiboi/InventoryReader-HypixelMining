@@ -2,6 +2,8 @@ package inventoryreader.ir.mixin;
 
 import inventoryreader.ir.ExeDownloadScreen;
 import inventoryreader.ir.InventoryReader;
+import inventoryreader.ir.ModConfig;
+import inventoryreader.ir.SecurityWarningScreen;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.TitleScreen;
 import org.spongepowered.asm.mixin.Mixin;
@@ -18,7 +20,11 @@ public class TitleScreenMixin {
         if (!hasShownDownloadScreen) {
             InventoryReader.LOGGER.info("TitleScreenMixin - Showing download screen");
             hasShownDownloadScreen = true;
-            MinecraftClient.getInstance().setScreen(new ExeDownloadScreen());
+            if (ModConfig.shouldAlwaysConfirmDownloads()) {
+                MinecraftClient.getInstance().setScreen(new SecurityWarningScreen(MinecraftClient.getInstance().currentScreen));
+            } else {
+                MinecraftClient.getInstance().setScreen(new ExeDownloadScreen());
+            }
         }
     }
 }

@@ -8,12 +8,13 @@
 		"Scholiboi"
 	],
 	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/Scholiboi/InventoryReader-HypixelMining"
+		"homepage": "https://github.com/Scholiboi/hypixel-forge",
+		"sources": "https://github.com/Scholiboi/hypixel-forge",
+		"issues": "https://github.com/Scholiboi/hypixel-forge/issues"
 	},
 	"license": "MIT",
 	"icon": "assets/ir/icon.png",
-	"environment": "*",
+	"environment": "client",
 	"entrypoints": {
   		"main": [
     		"inventoryreader.ir.InventoryReader"
@@ -31,8 +32,5 @@
 		"minecraft": "~1.21.1",
 		"java": ">=21",
 		"fabric-api": "*"
-	},
-	"suggests": {
-		"another-mod": "*"
 	}
 }

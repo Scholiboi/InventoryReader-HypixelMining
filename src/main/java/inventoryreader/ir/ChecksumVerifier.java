@@ -14,20 +14,41 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
+import net.minecraft.client.MinecraftClient;
+
 public class ChecksumVerifier {
     private static final String HASH_ALGORITHM = "SHA-256";
-    
-    // Hardcoded values for the executable and its expected checksum
-    public static final String EXE_FILENAME = "hypixel_dwarven_forge-v1.1.2.exe";
-    public static final String EXPECTED_CHECKSUM = "8df62946105d4e980da5ddaac158968452ef02b4be5ed9a309b1dc085bbef8cf";
+
+    public static final String MOD_VERSION = "1.1.2";
+    public static final String EXE_FILENAME = "hypixel_dwarven_forge-v" + MOD_VERSION + ".exe";
+
+    private static final Map<String, String> CHECKSUMS_BY_PLATFORM;
+    static {
+        CHECKSUMS_BY_PLATFORM = new HashMap<>();
+        CHECKSUMS_BY_PLATFORM.put("windows", "8df62946105d4e980da5ddaac158968452ef02b4be5ed9a309b1dc085bbef8cf");
+    }
+
+    public static final String EXPECTED_CHECKSUM = getChecksumForCurrentPlatform();
+
+    private static String getChecksumForCurrentPlatform() {
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win")) {
+            return CHECKSUMS_BY_PLATFORM.get("windows");
+        } else {
+            InventoryReader.LOGGER.error("Unsupported OS: {}. This mod currently only works on Windows.", os);
+            return CHECKSUMS_BY_PLATFORM.get("windows"); // Return Windows checksum as fallback
+        }
+    }
 
     //use paths from FilePathManager
     public static boolean verify(File file) {
         try {
             String filename = file.getName();
-            String expectedChecksum = getStoredChecksum(filename);
+            String retrievedChecksum = getStoredChecksum(filename);
             
-            if (expectedChecksum == null) {
+            final String expectedChecksum;
+            
+            if (retrievedChecksum == null) {
                 if (filename.equals(EXE_FILENAME)) {
                     expectedChecksum = EXPECTED_CHECKSUM;
                     InventoryReader.LOGGER.info("Using hardcoded value for initial verification");
@@ -35,10 +56,21 @@ public class ChecksumVerifier {
                     InventoryReader.LOGGER.error("No checksum defined for: {}", filename);
                     return false;
                 }
+            } else {
+                expectedChecksum = retrievedChecksum;
             }
             
             String calculatedChecksum = calculateChecksum(file);
             boolean match = expectedChecksum.equalsIgnoreCase(calculatedChecksum);
+            
+            if (ModConfig.shouldShowVerificationReports() && filename.equals(EXE_FILENAME)) {
+                final String finalCalculatedChecksum = calculatedChecksum;
+                MinecraftClient.getInstance().execute(() -> {
+                    MinecraftClient.getInstance().setScreen(
+                        new VerificationReportScreen(file, finalCalculatedChecksum, expectedChecksum)
+                    );
+                });
+            }
             
             if (!match) {
                 InventoryReader.LOGGER.warn("Checksum mismatch: {} (expected: {}, actual: {})", 

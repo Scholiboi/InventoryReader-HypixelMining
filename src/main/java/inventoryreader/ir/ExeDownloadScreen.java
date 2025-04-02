@@ -173,11 +173,19 @@ public class ExeDownloadScreen extends Screen {
         switch (currentState) {
             case INITIAL:
                 context.drawCenteredTextWithShadow(this.textRenderer, "IR Mod Setup - Required Files", this.width / 2, 20, 0xFFFFFF);
-                context.drawCenteredTextWithShadow(this.textRenderer, "The application for IR Mod needs to be downloaded:", this.width / 2, 50, 0xFFFFFF);
-                context.drawCenteredTextWithShadow(this.textRenderer, ChecksumVerifier.EXE_FILENAME, this.width / 2, 70, 0x00FFFF);
-                context.drawCenteredTextWithShadow(this.textRenderer, "File size: ~" + estimateFileSize() + " MB", this.width / 2, 90, 0xDDDDDD);
-                context.drawCenteredTextWithShadow(this.textRenderer, "Press OK to continue.", this.width / 2, 120, 0xFFFFFF);
+                context.drawCenteredTextWithShadow(this.textRenderer, "The application for IR Mod needs to be downloaded:", this.width / 2, 40, 0xFFFFFF);
+                context.drawCenteredTextWithShadow(this.textRenderer, ChecksumVerifier.EXE_FILENAME, this.width / 2, 60, 0x00FFFF);
+                context.drawCenteredTextWithShadow(this.textRenderer, "File size: ~" + cachedFileSize + " MB", this.width / 2, 75, 0xDDDDDD);
+
+                context.drawCenteredTextWithShadow(this.textRenderer, "⚠️ WINDOWS ONLY - NOT COMPATIBLE WITH MAC/LINUX ⚠️", this.width / 2, 95, 0xFFAA00);
+
+                context.drawCenteredTextWithShadow(this.textRenderer, "This file will be verified using SHA-256:", this.width / 2, 115, 0xFFFFFF);
+                String expectedChecksum = ChecksumVerifier.EXPECTED_CHECKSUM;
+                String displayChecksum = expectedChecksum.substring(0, 15) + "..." + expectedChecksum.substring(expectedChecksum.length() - 15);
+                context.drawCenteredTextWithShadow(this.textRenderer, displayChecksum, this.width / 2, 130, 0xAAFFAA);
                 
+                context.drawCenteredTextWithShadow(this.textRenderer, "Press OK to continue or Cancel to exit", this.width / 2, 155, 0xFFFFFF);
+
                 String githubLink = "https://github.com/Scholiboi/hypixel-forge";
                 int linkWidth = this.textRenderer.getWidth(githubLink);
                 int linkX = this.width / 2 - linkWidth / 2;
@@ -188,7 +196,7 @@ public class ExeDownloadScreen extends Screen {
                 
                 if (mouseX >= linkX && mouseX <= linkX + linkWidth && 
                     mouseY >= linkY && mouseY <= linkY + 9 && this.lastMouseButtonClicked == 0) {
-                    this.lastMouseButtonClicked = -1;
+                    this.lastMouseButtonClicked = -1; // Reset click state
                     try {
                         Util.getOperatingSystem().open(new URI(githubLink));
                     } catch (Exception e) {
@@ -243,10 +251,6 @@ public class ExeDownloadScreen extends Screen {
         }
     }
     
-    private String estimateFileSize() {
-        return cachedFileSize;
-    }
-
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         this.lastMouseButtonClicked = button;
