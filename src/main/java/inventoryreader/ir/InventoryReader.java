@@ -2,6 +2,7 @@ package inventoryreader.ir;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.MinecraftClient;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -57,12 +58,25 @@ public class InventoryReader implements ModInitializer{
         try {
             File exeFile = FilePathManager.getExecutablePath();
             if (exeFile.exists()) {
-                ProcessBuilder builder = new ProcessBuilder(exeFile.getAbsolutePath());
-                builder.redirectError(ProcessBuilder.Redirect.INHERIT);
-                serverProcess = builder.start();
-                serverRunning.set(true);
+                if (ChecksumVerifier.verify(exeFile)) {
+                    InventoryReader.LOGGER.info("Verified EXE. Launching...");
+                    ProcessBuilder builder = new ProcessBuilder(exeFile.getAbsolutePath());
+                    builder.redirectError(ProcessBuilder.Redirect.INHERIT);
+                    serverProcess = builder.start();
+                    serverRunning.set(true);
+                } else {
+                    InventoryReader.LOGGER.error("Verification failed. Quarantining...");
+                    ChecksumVerifier.handleFailedVerification(exeFile);
+
+                    MinecraftClient.getInstance().execute(() ->
+                        MinecraftClient.getInstance().setScreen(new ExeDownloadScreen())
+                    );
+                }
             } else {
-                LOGGER.warn("Executable not found. The GUI will handle downloading it.");
+                LOGGER.warn("Executable not found. Opening download screen...");
+                MinecraftClient.getInstance().execute(() ->
+                    MinecraftClient.getInstance().setScreen(new ExeDownloadScreen())
+                );
             }
         } catch (Exception e) {
             LOGGER.error("Failed to start server executable", e);
