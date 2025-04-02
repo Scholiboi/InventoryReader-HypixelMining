@@ -1,4 +1,5 @@
 # Inventory Reader
+## Also known as Skyblock Mining Resource Reader
 
 A Minecraft Fabric mod that seamlessly tracks inventory and storage data for Hypixel Skyblock.
 
