@@ -1,15 +1,14 @@
 package inventoryreader.ir.mixin;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 
 import inventoryreader.ir.HttpUtil;
 import inventoryreader.ir.InventoryReader;
 import inventoryreader.ir.SendingManager;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.network.packet.s2c.play.GameMessageS2CPacket;
+import net.minecraft.text.HoverEvent;
+import net.minecraft.text.HoverEvent.ShowText;
 import net.minecraft.text.Text;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -23,6 +22,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -58,156 +58,83 @@ public class ChatMessageMixin {
         }
         try{
             Text text = packet.content();
+            List<Text> contents = text.getSiblings();
+
             String messageString = text.getString();
-
-            // InventoryReader.LOGGER.info("Received message: " + messageString + " on thread: " + Thread.currentThread().getName());
-
-            int count = 0;
-            String name = "";
-            boolean hasCount = false;
-            boolean hasName = false;
-            boolean matchFound = false;
-            boolean twocheck = false;
+            Map<String, Integer> itemMap = new HashMap<>();
 
             Matcher matcher1 = SACKS_PATTERN_1.matcher(messageString);
             Matcher matcher2 = SACKS_PATTERN_2.matcher(messageString);
 
-            JsonArray itemsArray = new JsonArray();
-            if ((matcher1.find() || matcher2.find())&&(Thread.currentThread().getName().contains("Render"))) {
-                matchFound = true;
-                InventoryReader.LOGGER.info("Match found: " + messageString);
+            boolean is1stMatcher = matcher1.find();
+            boolean is2ndMatcher = matcher2.find();
 
+            if ((is1stMatcher || is2ndMatcher)&&(Thread.currentThread().getName().contains("Render"))) {
+//                InventoryReader.LOGGER.info("Processing raw text: {}", text);
+                if (is1stMatcher){
+                    InventoryReader.LOGGER.warn("Matcher 1 found, processing hover text");
+                    HoverEvent hoverEvent1 = contents.getFirst().getStyle().getHoverEvent();
+                    HoverEvent hoverEvent2 = contents.get(3).getStyle().getHoverEvent();
+                    ShowText innerText1 = (ShowText) hoverEvent1;
+                    ShowText innerText2 = (ShowText) hoverEvent2;
 
-                String jsonString = GSON.toJson(text);
-                // InventoryReader.LOGGER.info("Chat Message JSON: " + jsonString);
-
-                JsonObject jsonObject = GSON.fromJson(jsonString, JsonObject.class);
-                JsonArray rootArray = jsonObject.getAsJsonArray("field_39006");
-                
-                if (rootArray.size() > 3) twocheck = true;
-
-                // InventoryReader.LOGGER.info("rootArray: " + rootArray);
-                if (rootArray.size() > 2) {
-                    JsonElement element = rootArray.get(0);
-                    if (element.isJsonObject()) {
-                        JsonObject targetObject = element.getAsJsonObject();
-                        // InventoryReader.LOGGER.info("targetObject: " + targetObject);
-                        if (targetObject.has("field_39007")) {
-                            JsonObject field_39007 = targetObject.getAsJsonObject("field_39007");
-                            if (field_39007.has("field_11858")) {
-                                JsonObject field_11858 = field_39007.getAsJsonObject("field_11858");
-                                if (field_11858.has("field_46602")) {
-                                    JsonObject field_46602 = field_11858.getAsJsonObject("field_46602");
-                                    if (field_46602.has("comp_1986")) {
-                                        JsonObject comp_1986 = field_46602.getAsJsonObject("comp_1986");
-                                        if (comp_1986.has("field_39006")) {
-                                            itemsArray = comp_1986.getAsJsonArray("field_39006");
-                                            // InventoryReader.LOGGER.info("itemsArray: " + itemsArray);
-                                        } else {
-                                            InventoryReader.LOGGER.warn("comp_1986 does not contain field_39006");
-                                        }
-                                    } else {
-                                        InventoryReader.LOGGER.warn("field_46602 does not contain comp_1986");
-                                    }
-                                } else {
-                                    InventoryReader.LOGGER.warn("field_11858 does not contain field_46602");
-                                }
-                            } else {
-                                InventoryReader.LOGGER.warn("field_39007 does not contain field_11858");
-                            }
-                        } else {
-                            InventoryReader.LOGGER.warn("targetObject does not contain field_39007");
-                        }
-                    } else {
-                        InventoryReader.LOGGER.warn("rootArray element is not a JsonObject");
+                    Text hoverChildren1 = null;
+                    Text hoverChildren2 = null;
+                    if (innerText1 != null) {
+                        hoverChildren1 = innerText1.value();
                     }
+                    if (innerText2 != null) {
+                        hoverChildren2 = innerText2.value();
+                    }
+                    if (hoverChildren1 == null || hoverChildren1.getSiblings().isEmpty() ||
+                        hoverChildren2 == null || hoverChildren2.getSiblings().isEmpty()) {
+                        InventoryReader.LOGGER.warn("Hover text is empty or null");
+                        return;
+                    }
+                    List<Text> hoverChildrenList1 = hoverChildren1.getSiblings();
+                    List<Text> hoverChildrenList2 = hoverChildren2.getSiblings();
+                    itemMap = getItemMapFromText(hoverChildrenList1, itemMap);
+                    itemMap = getItemMapFromText(hoverChildrenList2, itemMap);
                 } else {
-                    InventoryReader.LOGGER.warn("rootArray is null or does not have enough elements");
+                    InventoryReader.LOGGER.warn("Matcher 2 found, processing hover text");
+                    HoverEvent hoverEvent = contents.getFirst().getStyle().getHoverEvent();
+                    ShowText innerText = (ShowText) hoverEvent;
+                    Text hoverChildren = null;
+                    if (innerText != null) {
+                        hoverChildren = innerText.value();
+                    }
+                    if (hoverChildren == null || hoverChildren.getSiblings().isEmpty()) {
+                        InventoryReader.LOGGER.warn("Hover text is empty or null");
+                        return;
+                    }
+                    List<Text> hoverChildrenList = hoverChildren.getSiblings();
+                    itemMap = getItemMapFromText(hoverChildrenList, itemMap);
                 }
-            if (twocheck){
-                InventoryReader.LOGGER.info("Twocheck");
-                JsonArray itemsArray2 = new JsonArray();
-                if (rootArray.size() > 2) {
-                    JsonElement element = rootArray.get(3);
-                    if (element.isJsonObject()) {
-                        JsonObject targetObject = element.getAsJsonObject();
-                        // InventoryReader.LOGGER.info("targetObject: " + targetObject);
-                        if (targetObject.has("field_39007")) {
-                            JsonObject field_39007 = targetObject.getAsJsonObject("field_39007");
-                            if (field_39007.has("field_11858")) {
-                                JsonObject field_11858 = field_39007.getAsJsonObject("field_11858");
-                                if (field_11858.has("field_46602")) {
-                                    JsonObject field_46602 = field_11858.getAsJsonObject("field_46602");
-                                    if (field_46602.has("comp_1986")) {
-                                        JsonObject comp_1986 = field_46602.getAsJsonObject("comp_1986");
-                                        if (comp_1986.has("field_39006")) {
-                                            itemsArray2 = comp_1986.getAsJsonArray("field_39006");
-                                            // InventoryReader.LOGGER.info("itemsArray: " + itemsArray);
-                                        } else {
-                                            InventoryReader.LOGGER.warn("comp_1986 does not contain field_39006");
-                                        }
-                                    } else {
-                                        InventoryReader.LOGGER.warn("field_46602 does not contain comp_1986");
-                                    }
-                                } else {
-                                    InventoryReader.LOGGER.warn("field_11858 does not contain field_46602");
-                                }
-                            } else {
-                                InventoryReader.LOGGER.warn("field_39007 does not contain field_11858");
-                            }
-                        } else {
-                            InventoryReader.LOGGER.warn("targetObject does not contain field_39007");
-                        }
-                    } else {
-                        InventoryReader.LOGGER.warn("rootArray element is not a JsonObject");
-                    }
-                } else {
-                    InventoryReader.LOGGER.warn("rootArray is null or does not have enough elements");
-                }
-                itemsArray.addAll(itemsArray2);
-            }
-        }
-            Map<String, Integer> itemMap = new HashMap<>();
-
-            if (matchFound) {
-                for (JsonElement itemElement : itemsArray) {
-                    JsonObject itemObject = itemElement.getAsJsonObject();
-                    if (!itemObject.has("field_39005")) {
-                        continue;
-                    }
-                    String comp737 = itemObject.getAsJsonObject("field_39005").get("comp_737").getAsString().trim();
-
-                    if (comp737.matches("[+-].+")) {
-                        count = Integer.parseInt(comp737.replace(",", ""));
-                        hasCount = true;
-                        continue;
-                    }
-                    if (hasCount) {
-                        if (comp737.contains("Gemstone")) {
-                            name = comp737.substring(2);
-                        } else {
-                            name = comp737;
-                        }
-                        hasName = true;
-                    }
-                    if (hasName) {
-                        if (itemMap.containsKey(name)) {
-                            count += itemMap.get(name);
-                        }
-                        itemMap.put(name, count);
-                        hasName = false;
-                        hasCount = false;
-                    }
-                }
-                itemMap.forEach((key, value) -> InventoryReader.LOGGER.info("Item: " + key + ", Count: " + value));
-
                 sendItemMapToEndpoint(itemMap);
-                matchFound = false;
-                twocheck = false;
             }
         } finally {
             isProcessing.set(false);
         }
+    }
+
+    @Unique
+    private Map<String, Integer> getItemMapFromText(List<Text> contents, Map<String, Integer> itemMap) {
+        int count = 0;
+        String name = "";
+        for (int i = 0; i < contents.size()-1; i++) {
+            if (contents.get(i).getString().isEmpty()) {
+                continue;
+            }
+            if (i % 4 == 0) {
+                String num = contents.get(i).getString().trim().replaceAll(",", "");
+                count = Integer.parseInt(num);
+            } else if (i % 4 == 1) {
+                name = contents.get(i).getString().trim();
+                InventoryReader.LOGGER.info("Found item: " + name + " with count: " + count);
+                itemMap.put(name, count);
+            }
+        }
+        return itemMap;
     }
 
     @Unique

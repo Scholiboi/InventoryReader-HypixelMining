@@ -137,7 +137,7 @@ public class InventoryReaderClient implements ClientModInitializer {
         }
         
         if (changesData.isEmpty()) return;
-        HttpUtil.HTTP_EXECUTOR.submit(() -> {
+//        HttpUtil.HTTP_EXECUTOR.submit(() -> {
             try {
                 HttpClient client = HttpClient.newHttpClient();
                 String jsonInputString = gson.toJson(changesData);
@@ -152,7 +152,7 @@ public class InventoryReaderClient implements ClientModInitializer {
             } catch (Exception e) {
                 InventoryReader.LOGGER.error("Failed to send data to server", e);
             }
-        });
+//        });
     }
 
     private void saveDataToFile() {
