@@ -16,6 +16,10 @@ public class WelcomeManager {
     private static boolean isFirstTimeUser = true;
 
     public static void initialize() {
+        checkFirstTimeUser();
+        if (!isFirstTimeUser) {
+            return;
+        }
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             client.execute(() -> {
                 try {
@@ -34,10 +38,6 @@ public class WelcomeManager {
 
     private static void showWelcomeMessage(MinecraftClient client) {
         if (client.player == null) return;
-        checkFirstTimeUser();
-        if (!isFirstTimeUser) {
-            return;
-        }
 
         String divider = "§6§l" + "=".repeat(40);
         
