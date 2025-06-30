@@ -246,7 +246,7 @@ public class SandboxWidget {
     private boolean checkNodeClick(RecipeManager.RecipeNode node, double mouseX, double mouseY, int x, int y, int level) {
         if (node == null) return false;
         int indent = level * RECIPE_LEVEL_INDENT;
-        int nodeHeight = 18;
+        int nodeHeight = 16;
         boolean hasChildren = node.ingredients != null && !node.ingredients.isEmpty();
         int nodeWidth = 230 - indent;
         if (mouseY >= y && mouseY <= y + nodeHeight) {
@@ -283,7 +283,7 @@ public class SandboxWidget {
     }
     private int getExpandedNodeHeight(RecipeManager.RecipeNode node) {
         if (node == null) return 0;
-        int height = 18;
+        int height = 16;
         if (node.ingredients != null && !node.ingredients.isEmpty() && 
             expandedNodes.getOrDefault(getNodeKey(node), false)) {
             for (RecipeManager.RecipeNode child : node.ingredients) {
@@ -356,9 +356,9 @@ public class SandboxWidget {
         int visibleLines = countVisibleRecipeTreeLines(recipeTree);
         
         int messageLines = countMessageLines(client, panelWidth);
-        int messageSectionHeight = messageLines > 0 ? messageLines * 18 + 25 : 0; 
+        int messageSectionHeight = messageLines > 0 ? messageLines * 16 + 20 : 0; 
         
-        int panelHeight = Math.min(height - 40, 20 + (visibleLines * 18) + messageSectionHeight + 30);
+        int panelHeight = Math.min(height - 40, 20 + (visibleLines * 16) + messageSectionHeight + 20);
         int panelX = widgetX;
         int panelY = widgetY;
         context.fill(panelX, panelY, panelX + panelWidth, panelY + panelHeight, DARK_PANEL_BG);
@@ -401,10 +401,10 @@ public class SandboxWidget {
         
         int messagesDisplayHeight = 0;
         if (!messages.isEmpty()) {
-            messagesDisplayHeight = countMessageLines(client, panelWidth) * 18 + 25; // 25px for header and spacing
+            messagesDisplayHeight = countMessageLines(client, panelWidth) * 16 + 20; // 20px for header and spacing
         }
 
-        int maxRecipeTreeY = panelY + panelHeight - messagesDisplayHeight - 15;
+        int maxRecipeTreeY = panelY + panelHeight - messagesDisplayHeight - 10;
         
         int afterTreeY = renderRecipeTree(context, recipeTree, panelX, y, 0, maxRecipeTreeY);
         
@@ -501,7 +501,7 @@ public class SandboxWidget {
             0xFFFFFFFF,
             false
         );
-        y += 18;
+        y += 16;
         if (hasChildren && isExpanded && node.ingredients.size() > 0) {
             int lineColor = 0xFF777777;
             for (int i = 0; i < node.ingredients.size(); i++) {
@@ -606,7 +606,7 @@ public class SandboxWidget {
                         textColor,
                         false
                     );
-                    y += 10;
+                    y += 9;
                 }
             }
         }

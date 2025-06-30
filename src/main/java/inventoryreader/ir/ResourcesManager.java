@@ -24,6 +24,15 @@ public class ResourcesManager {
         return INSTANCE;
     }
 
+    private void directSave(Map<String, Integer> resources) {
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        try (FileWriter writer = new FileWriter(resourcesFile)) {
+            gson.toJson(resources, writer);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public void saveData(Map<String, Integer> data) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         Map<String, Integer> resources = new java.util.LinkedHashMap<>();
@@ -79,7 +88,7 @@ public class ResourcesManager {
     public void setResourceAmount(String name, int amount) {
         Map<String, Integer> resources = getAllResources();
         resources.put(name, amount);
-        saveData(resources);
+        directSave(resources);
     }
 
     public void craft(String name, int amt) {
@@ -171,85 +180,134 @@ public class ResourcesManager {
     public RemainingResponse getRemainingIngredients(String name, int amt) {
         RecipeManager rm = RecipeManager.getInstance();
         Map<String, Map<String, Integer>> forging = rm.getAllRecipes();
-        Map<String, Integer> myResources = getAllResources();
+        Map<String, Integer> highestPossibleResources = getAllResources();
+        Map<String, Integer> currentAvailableResources = new LinkedHashMap<>(highestPossibleResources);
         Map<String, Integer> messages = new LinkedHashMap<>();
-        int old = myResources.getOrDefault(name, 0);
-        Map<String, Integer> simResources = new LinkedHashMap<>(myResources);
-        buildRecipe(name, amt, forging, simResources, messages);
-        int updated = simResources.getOrDefault(name, 0);
+        
+        // Initialize resources with default values to avoid null pointer exceptions
+        initializeResourceMaps(name, forging, highestPossibleResources, currentAvailableResources);
+        
+        int old = highestPossibleResources.getOrDefault(name, 0);
+        buildRecipe(name, amt, forging, highestPossibleResources, currentAvailableResources, messages);
+        int updated = highestPossibleResources.getOrDefault(name, 0);
+        
         RecipeNode fullRecipe;
         if (updated - old >= amt) {
-            fullRecipe = expandRequiredRecipe(name, (updated-old)-amt, forging, simResources);
+            fullRecipe = expandRequiredRecipe(name, (updated-old)-amt, forging, highestPossibleResources);
         } else {
-            fullRecipe = expandRequiredRecipe(name, amt-(updated-old), forging, simResources);
+            fullRecipe = expandRequiredRecipe(name, amt-(updated-old), forging, highestPossibleResources);
         }
         return new RemainingResponse(name, fullRecipe, messages);
     }
 
-    private void buildRecipe(String currentItem, int multiplier, Map<String, Map<String, Integer>> forging, Map<String, Integer> myResources, Map<String, Integer> messages) {
+    private void buildRecipe(String currentItem, int multiplier, Map<String, Map<String, Integer>> forging, 
+                            Map<String, Integer> highestPossibleResources, Map<String, Integer> currentAvailableResources, 
+                            Map<String, Integer> messages) {
         Map<String, Integer> recipe = forging.get(currentItem);
         if (recipe == null) return;
         for (Map.Entry<String, Integer> entry : recipe.entrySet()) {
             String item = entry.getKey();
             int quantity = entry.getValue();
             if (forging.containsKey(item)) {
-                compositeMaterial(item, Math.max(0, (quantity * multiplier) - myResources.getOrDefault(item, 0)), forging, myResources, messages);
+                int need = Math.max(0, (quantity * multiplier) - currentAvailableResources.getOrDefault(item, 0));
+                compositeMaterial(item, need, forging, highestPossibleResources, currentAvailableResources, messages);
             }
         }
-        check(currentItem, multiplier, forging, myResources, messages);
+        check(currentItem, multiplier, forging, highestPossibleResources, currentAvailableResources, messages);
     }
 
-    private void check(String currentItem, int multiplier, Map<String, Map<String, Integer>> forging, Map<String, Integer> myResources, Map<String, Integer> messages) {
+    private void check(String currentItem, int multiplier, Map<String, Map<String, Integer>> forging, 
+                       Map<String, Integer> highestPossibleResources, Map<String, Integer> currentAvailableResources, 
+                       Map<String, Integer> messages) {
         Map<String, Integer> recipe = forging.get(currentItem);
         if (recipe == null) return;
+        
         List<Integer> count = new ArrayList<>();
+        Map<String, Integer> possibleItemsDict = new LinkedHashMap<>();
+        
         for (Map.Entry<String, Integer> entry : recipe.entrySet()) {
             String baseItem = entry.getKey();
             int quantityOfBaseItem = entry.getValue();
-            int possibleItems = myResources.getOrDefault(baseItem, 0) / quantityOfBaseItem;
+            int possibleItems = currentAvailableResources.getOrDefault(baseItem, 0) / quantityOfBaseItem;
+            possibleItemsDict.put(baseItem, possibleItems);
             count.add(multiplier - possibleItems);
         }
+        
         int maxcount = count.stream().mapToInt(i -> i).max().orElse(0);
-        maxcount = Math.max(maxcount, 0);
-        myResources.put(currentItem, myResources.getOrDefault(currentItem, 0) + (multiplier - maxcount));
-        if (multiplier - maxcount > 0) {
-            messages.put(currentItem, messages.getOrDefault(currentItem, 0) + (multiplier - maxcount));
+        maxcount = Math.max(maxcount, 0); // If maxcount <= 0, we have enough resources
+        
+        int amountAbleToCraft = multiplier - maxcount;
+        
+        highestPossibleResources.put(currentItem, 
+                                    highestPossibleResources.getOrDefault(currentItem, 0) + amountAbleToCraft);
+        currentAvailableResources.put(currentItem, 
+                                     currentAvailableResources.getOrDefault(currentItem, 0) + amountAbleToCraft);
+        
+        if (amountAbleToCraft > 0) {
+            messages.put(currentItem, 
+                          messages.getOrDefault(currentItem, 0) + amountAbleToCraft);
         }
-        allocate(currentItem, multiplier-maxcount, forging, myResources);
+        
+        allocate(currentItem, multiplier, maxcount, possibleItemsDict, forging, 
+                highestPossibleResources, currentAvailableResources);
     }
 
-    private void allocate(String currentItem, int a, Map<String, Map<String, Integer>> forging, Map<String, Integer> myResources) {
+    private void allocate(String currentItem, int multiplier, int maxcount, Map<String, Integer> possibleItemsDict,
+                          Map<String, Map<String, Integer>> forging, Map<String, Integer> highestPossibleResources, 
+                          Map<String, Integer> currentAvailableResources) {
         Map<String, Integer> recipe = forging.get(currentItem);
         if (recipe == null) return;
+        
+        int amountAbleToCraftOfHigherMaterial = multiplier - maxcount;
+
         for (Map.Entry<String, Integer> entry : recipe.entrySet()) {
             String baseItem = entry.getKey();
             int quantityOfBaseItem = entry.getValue();
-            myResources.put(baseItem, myResources.getOrDefault(baseItem, 0) - quantityOfBaseItem * a);
+            highestPossibleResources.put(baseItem, 
+                   highestPossibleResources.getOrDefault(baseItem, 0) - 
+                   quantityOfBaseItem * amountAbleToCraftOfHigherMaterial);
+        }
+
+        if (multiplier != 0) {
+            for (Map.Entry<String, Integer> entry : recipe.entrySet()) {
+                String baseItem = entry.getKey();
+                int quantityOfBaseItem = entry.getValue();
+                int possibleItems = possibleItemsDict.getOrDefault(baseItem, 0);
+                int amountLeftToAllocate = Math.min(multiplier, possibleItems);
+                currentAvailableResources.put(baseItem, 
+                       currentAvailableResources.getOrDefault(baseItem, 0) - 
+                       quantityOfBaseItem * amountLeftToAllocate);
+            }
         }
     }
 
-    private void compositeMaterial(String currentItem, int multiplier, Map<String, Map<String, Integer>> forging, Map<String, Integer> myResources, Map<String, Integer> messages) {
+    private void compositeMaterial(String currentItem, int multiplier, Map<String, Map<String, Integer>> forging,
+                                  Map<String, Integer> highestPossibleResources, Map<String, Integer> currentAvailableResources,
+                                  Map<String, Integer> messages) {
         Map<String, Integer> recipe = forging.get(currentItem);
         if (recipe == null) return;
+        
         for (Map.Entry<String, Integer> entry : recipe.entrySet()) {
             String item = entry.getKey();
             int quantity = entry.getValue();
             if (forging.containsKey(item)) {
-                compositeMaterial(item, Math.max(0, (quantity * multiplier) - myResources.getOrDefault(item, 0)), forging, myResources, messages);
+                int need = Math.max(0, (quantity * multiplier) - currentAvailableResources.getOrDefault(item, 0));
+                compositeMaterial(item, need, forging, highestPossibleResources, currentAvailableResources, messages);
             }
         }
-        check(currentItem, multiplier, forging, myResources, messages);
+        
+        check(currentItem, multiplier, forging, highestPossibleResources, currentAvailableResources, messages);
     }
 
-    private RecipeNode expandRequiredRecipe(String currentName, int multiplier, Map<String, Map<String, Integer>> forging, Map<String, Integer> myResources) {
+    private RecipeNode expandRequiredRecipe(String currentName, int multiplier, Map<String, Map<String, Integer>> forging, Map<String, Integer> highestPossibleResources) {
         if (!forging.containsKey(currentName)) {
-            int have = myResources.getOrDefault(currentName, 0);
+            int have = highestPossibleResources.getOrDefault(currentName, 0);
             if (have < multiplier) {
                 int temp = have;
-                myResources.put(currentName, 0);
+                highestPossibleResources.put(currentName, 0);
                 return new RecipeNode(currentName, multiplier - temp, Collections.emptyList());
             } else {
-                myResources.put(currentName, have - multiplier);
+                highestPossibleResources.put(currentName, have - multiplier);
                 return new RecipeNode(currentName, 0, Collections.emptyList());
             }
         } else {
@@ -258,27 +316,48 @@ public class ResourcesManager {
                 String item = entry.getKey();
                 int qty = entry.getValue();
                 if (forging.containsKey(item)) {
-                    if (myResources.getOrDefault(item, 0) < qty * multiplier) {
-                        RecipeNode expanded = expandRequiredRecipe(item, (qty * multiplier) - myResources.getOrDefault(item, 0), forging, myResources);
+                    if (highestPossibleResources.getOrDefault(item, 0) < qty * multiplier) {
+                        RecipeNode expanded = expandRequiredRecipe(item, 
+                                             (qty * multiplier) - highestPossibleResources.getOrDefault(item, 0), 
+                                             forging, highestPossibleResources);
                         ingredients.add(expanded);
-                        myResources.put(item, 0);
+                        highestPossibleResources.put(item, 0);
                     } else {
-                        myResources.put(item, myResources.getOrDefault(item, 0) - qty * multiplier);
-                        RecipeNode expanded = expandRequiredRecipe(item, 0, forging, myResources);
+                        highestPossibleResources.put(item, highestPossibleResources.getOrDefault(item, 0) - qty * multiplier);
+                        RecipeNode expanded = expandRequiredRecipe(item, 0, forging, highestPossibleResources);
                         ingredients.add(expanded);
                     }
                 } else {
-                    if (myResources.getOrDefault(item, 0) < qty * multiplier) {
-                        RecipeNode expanded = expandRequiredRecipe(item, qty * multiplier, forging, myResources);
+                    if (highestPossibleResources.getOrDefault(item, 0) < qty * multiplier) {
+                        RecipeNode expanded = expandRequiredRecipe(item, qty * multiplier, forging, highestPossibleResources);
                         ingredients.add(expanded);
                     } else {
-                        myResources.put(item, myResources.getOrDefault(item, 0) - qty * multiplier);
-                        RecipeNode expanded = expandRequiredRecipe(item, 0, forging, myResources);
+                        highestPossibleResources.put(item, highestPossibleResources.getOrDefault(item, 0) - qty * multiplier);
+                        RecipeNode expanded = expandRequiredRecipe(item, 0, forging, highestPossibleResources);
                         ingredients.add(expanded);
                     }
                 }
             }
             return new RecipeNode(currentName, multiplier, ingredients);
+        }
+    }
+
+    private void initializeResourceMaps(String targetItem, Map<String, Map<String, Integer>> forging, 
+                                       Map<String, Integer> highestPossibleResources,
+                                       Map<String, Integer> currentAvailableResources) {
+        highestPossibleResources.putIfAbsent(targetItem, 0);
+        currentAvailableResources.putIfAbsent(targetItem, 0);
+        
+        if (forging.containsKey(targetItem)) {
+            Map<String, Integer> recipe = forging.get(targetItem);
+            for (String ingredient : recipe.keySet()) {
+                highestPossibleResources.putIfAbsent(ingredient, 0);
+                currentAvailableResources.putIfAbsent(ingredient, 0);
+                
+                if (forging.containsKey(ingredient)) {
+                    initializeResourceMaps(ingredient, forging, highestPossibleResources, currentAvailableResources);
+                }
+            }
         }
     }
 
@@ -295,10 +374,50 @@ public class ResourcesManager {
         public String name;
         public RecipeNode full_recipe;
         public Map<String, Integer> messages;
+        public List<String> messagesList;
+        
         public RemainingResponse(String name, RecipeNode fullRecipe, Map<String, Integer> messages) {
             this.name = name;
             this.full_recipe = fullRecipe;
             this.messages = messages;
+            
+            // Create a list version of messages for compatibility with the Python implementation
+            this.messagesList = new ArrayList<>();
+            for (Map.Entry<String, Integer> entry : messages.entrySet()) {
+                this.messagesList.add("You need to craft x" + entry.getValue() + " " + entry.getKey());
+            }
+        }
+        
+        public RemainingResponse(String name, RecipeNode fullRecipe, List<String> messagesList) {
+            this.name = name;
+            this.full_recipe = fullRecipe;
+            this.messagesList = messagesList;
+            
+            // Convert list to map for backward compatibility
+            this.messages = new LinkedHashMap<>();
+            for (String msg : messagesList) {
+                String[] parts = msg.split(" ");
+                if (parts.length >= 4) {
+                    String itemName = extractItemName(parts);
+                    try {
+                        int amount = Integer.parseInt(parts[3].substring(1));
+                        this.messages.put(itemName, this.messages.getOrDefault(itemName, 0) + amount);
+                    } catch (NumberFormatException e) {
+                        // Skip if we can't parse the amount
+                    }
+                }
+            }
+        }
+        
+        private String extractItemName(String[] parts) {
+            if (parts.length > 5) {
+                StringBuilder nameBuilder = new StringBuilder(parts[4]);
+                for (int i = 5; i < parts.length; i++) {
+                    nameBuilder.append(" ").append(parts[i]);
+                }
+                return nameBuilder.toString();
+            }
+            return parts[4];
         }
     }
 
