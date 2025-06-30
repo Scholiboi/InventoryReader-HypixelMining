@@ -4,8 +4,7 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "ChatMessageMixin",
-    "SlotClickMixin",
-    "TitleScreenMixin"
+    "SlotClickMixin"
   ],
   "injectors": {
     "defaultRequire": 1

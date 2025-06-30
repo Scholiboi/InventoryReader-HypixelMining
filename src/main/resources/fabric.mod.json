@@ -21,7 +21,8 @@
   		],
   		"client": [
 			"inventoryreader.ir.StorageViewerMod",
-			"inventoryreader.ir.InventoryReaderClient"
+			"inventoryreader.ir.InventoryReaderClient",
+			"inventoryreader.ir.IrCommandManager"
   		]
 	},
 	"mixins": [
@@ -29,7 +30,7 @@
 	],
 	"depends": {
 		"fabricloader": ">=0.16.3",
-		"minecraft": "~1.21.1",
+		"minecraft": "~1.21.5",
 		"java": ">=21",
 		"fabric-api": "*"
 	}

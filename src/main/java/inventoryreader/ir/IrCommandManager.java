@@ -2,24 +2,25 @@ package inventoryreader.ir;
 
 import com.mojang.brigadier.CommandDispatcher;
 
+import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.*;
+
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
-public class IrCommandManager {
-    
-    public static void registerCommands() {
-        InventoryReader.LOGGER.info("Registering IR client commands...");
+public class IrCommandManager implements ClientModInitializer{
+
+    @Override
+    public void onInitializeClient() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             registerIrCommands(dispatcher);
-            InventoryReader.LOGGER.info("IR client commands registered successfully!");
         });
     }
     
-    private static void registerIrCommands(CommandDispatcher<FabricClientCommandSource> dispatcher) {
+    public static void registerIrCommands(CommandDispatcher<FabricClientCommandSource> dispatcher) {
         dispatcher.register(
             literal("ir")
                 .executes(context -> {
@@ -28,6 +29,10 @@ public class IrCommandManager {
                     context.getSource().sendFeedback(Text.literal("- /ir reset: Reset all mod data")
                         .setStyle(Style.EMPTY.withColor(Formatting.WHITE)));
                     context.getSource().sendFeedback(Text.literal("- /ir done: Acknowledge reminder")
+                        .setStyle(Style.EMPTY.withColor(Formatting.WHITE)));
+                    context.getSource().sendFeedback(Text.literal("- /ir gui: Open Inventory Reader menu")
+                        .setStyle(Style.EMPTY.withColor(Formatting.WHITE)));
+                    context.getSource().sendFeedback(Text.literal("- /ir widget: Open Widget Customization Menu")
                         .setStyle(Style.EMPTY.withColor(Formatting.WHITE)));
                     return 1;
                 })
@@ -38,10 +43,8 @@ public class IrCommandManager {
 
                         SendingManager.blockNextDataSend();
 
-                        SackReader.getInstance().clearSacks();
                         StorageReader.getInstance().clearAllData();
-                        InventoryReader.clearAllserverData();
-                        InventoryReader.clearAlljsonData();
+                        FilePathManager.reInitializeFiles();
                         SackReader.setNeedsReminder(true);
                         
                         context.getSource().sendFeedback(Text.literal("Inventory Reader data reset! ")
@@ -60,6 +63,24 @@ public class IrCommandManager {
                         
                         context.getSource().sendFeedback(Text.literal("Acknowledged! Reminders stopped.")
                             .setStyle(Style.EMPTY.withColor(Formatting.GREEN)));
+                        return 1;
+                    })
+                )
+                
+                .then(literal("menu")
+                    .executes(context -> {
+                        InventoryReader.LOGGER.info("Opening SandboxViewer GUI (deferred)");
+                        try {
+                            inventoryreader.ir.InventoryReaderClient.shouldOpenSandboxViewer = true;
+                        } catch (Exception e) {
+                            InventoryReader.LOGGER.error("Failed to schedule SandboxViewer GUI", e);
+                        }
+                        return 1;
+                    })
+                )
+                .then(literal("widget")
+                    .executes(context -> {
+                        inventoryreader.ir.InventoryReaderClient.shouldOpenWidgetCustomization = true;
                         return 1;
                     })
                 )

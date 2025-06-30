@@ -2,9 +2,8 @@ package inventoryreader.ir.mixin;
 
 import com.google.gson.Gson;
 
-import inventoryreader.ir.HttpUtil;
 import inventoryreader.ir.InventoryReader;
-import inventoryreader.ir.SendingManager;
+import inventoryreader.ir.ResourcesManager;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.network.packet.s2c.play.GameMessageS2CPacket;
 import net.minecraft.text.HoverEvent;
@@ -16,11 +15,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +28,9 @@ import java.util.regex.Pattern;
 public class ChatMessageMixin {
     @Unique
     private static final Gson GSON = new Gson();
+
+    @Unique
+    private static final ResourcesManager RESOURCESMANAGER = ResourcesManager.getInstance();
 
     @Unique
     private static final Pattern SACKS_PATTERN_1 = Pattern.compile(
@@ -110,7 +107,7 @@ public class ChatMessageMixin {
                     List<Text> hoverChildrenList = hoverChildren.getSiblings();
                     itemMap = getItemMapFromText(hoverChildrenList, itemMap);
                 }
-                sendItemMapToEndpoint(itemMap);
+                RESOURCESMANAGER.saveData(itemMap);
             }
         } finally {
             isProcessing.set(false);
@@ -131,37 +128,12 @@ public class ChatMessageMixin {
             } else if (i % 4 == 1) {
                 name = contents.get(i).getString().trim();
                 InventoryReader.LOGGER.info("Found item: " + name + " with count: " + count);
+                if (itemMap.containsKey(name)) {
+                    count += itemMap.get(name);
+                }
                 itemMap.put(name, count);
             }
         }
         return itemMap;
-    }
-
-    @Unique
-    private void sendItemMapToEndpoint(Map<String, Integer> itemMap) {
-        if (!InventoryReader.serverRunning.get()) {
-            return;
-        }
-        
-        if (SendingManager.shouldSkipNextSend()) {
-            InventoryReader.LOGGER.info("Skipping chat data transmission after reset");
-            return;
-        }
-
-        HttpUtil.HTTP_EXECUTOR.submit(() -> {
-            try {
-                HttpClient client = HttpClient.newHttpClient();
-                String jsonInputString = GSON.toJson(itemMap);
-                HttpRequest request = HttpRequest.newBuilder()
-                        .uri(new URI("http://localhost:5000/api/mod/modify-resources"))
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(jsonInputString, StandardCharsets.UTF_8))
-                        .build();
-                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-                InventoryReader.LOGGER.info("POST Response Code :: " + response.statusCode());
-            } catch (Exception e) {
-                InventoryReader.LOGGER.error("Error sending item map to endpoint", e);
-            }
-        });
     }
 }

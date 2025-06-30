@@ -39,11 +39,11 @@ public class StorageViewerMod implements ClientModInitializer{
     }
 
     private void handleMenuOpen(MinecraftClient client) {
-        assert client.player != null;
         Screen currentScreen = client.currentScreen;
-        assert currentScreen != null;
+        if (currentScreen.getClass().getName().contains("SandboxViewer")) {
+            return;
+        }
         String title = currentScreen.getTitle().getString();
-        InventoryReader.LOGGER.info("Opened container: " + title);
         storageReader.saveContainerContents(client.player.currentScreenHandler, title);
         if (title.contains("Sack")) {
             sackReader.saveLoreComponents(client.player.currentScreenHandler, title);

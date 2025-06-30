@@ -6,30 +6,18 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.slot.Slot;
 import net.minecraft.text.Text;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+// import com.google.gson.Gson;
+// import com.google.gson.GsonBuilder;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
+import java.io.*;
 import java.util.*;
 
 public class SackReader {
-    Map<String, Integer> sackData = new HashMap<>();
-
-    private static final String SERVER_URL = "http://localhost:5000/api/mod/modify-resources"; // localhost server url
-
     private static final Set<String> GEMSTONE_RARITIES = new HashSet<>(Arrays.asList("Rough:", "Flawed:", "Fine:", "Flawless:", "Perfect:"));
-
-    private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
-
-    List<String> sackNames = new ArrayList<>();
-
+    private static final File SACK_NAMES_FILE = new File(FilePathManager.DATA_DIR, "sackNames.txt");
     private static SackReader instance;
-
     private static boolean needsReminder = false;
+    private static final ResourcesManager RESOURCES_MANAGER = ResourcesManager.getInstance();
 
     public static SackReader getInstance() {
         if (instance == null) {
@@ -38,23 +26,32 @@ public class SackReader {
         return instance;
     }
     
-    public void clearSacks() {
-        InventoryReader.LOGGER.info("Clearing all sack data");
-        sackNames.clear();
-        sackData.clear();
-        
-        try {
-            HttpClient client = HttpClient.newHttpClient();
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(new URI(SERVER_URL))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString("{\"reset\": true}", StandardCharsets.UTF_8))
-                    .build();
-                    
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            InventoryReader.LOGGER.info("Sack reset notification sent to server, status: " + response.statusCode());
-        } catch (Exception e) {
-            InventoryReader.LOGGER.error("Failed to send sack reset notification", e);
+    public List<String> loadSackNames() {
+        List<String> sackNames = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader(SACK_NAMES_FILE))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (!line.trim().isEmpty()) {
+                    sackNames.add(line.trim());
+                }
+            }
+            InventoryReader.LOGGER.info("Loaded {} sack names from file", sackNames.size());
+            
+        } catch (IOException e) {
+            InventoryReader.LOGGER.error("Failed to load sack names from file", e);
+        }
+        return sackNames;
+    }
+
+    public void saveSackNames(List<String> sackNames) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(SACK_NAMES_FILE))) {
+            for (String sackName : sackNames) {
+                writer.write(sackName);
+                writer.newLine();
+            }
+            InventoryReader.LOGGER.info("Saved {} sack names to file", sackNames.size());
+        } catch (IOException e) {
+            InventoryReader.LOGGER.error("Failed to save sack names to file", e);
         }
     }
 
@@ -67,17 +64,21 @@ public class SackReader {
     }
 
     public void saveLoreComponents(ScreenHandler handler, String title) {
+        List<String> sackNames = loadSackNames();
         if (sackNames.contains(title)) {
             return;
         } else {
             sackNames.add(title);
             setNeedsReminder(false);
             
+            saveSackNames(sackNames);
+            
             SendingManager.unblockDataSend();
         }
 
+        Map<String, Integer> sackData = new HashMap<>();
         if (title.contains("Gemstone")) {
-            saveGemstoneSackData(handler);
+            saveGemstoneSackData(handler, sackData);
             return;
         }
         List<Slot> slots = handler.slots;
@@ -106,10 +107,10 @@ public class SackReader {
                 }
             }
         }
-        sendDataToServer();
+        RESOURCES_MANAGER.saveData(sackData);
     }
 
-    private void saveGemstoneSackData(ScreenHandler handler){
+    private void saveGemstoneSackData(ScreenHandler handler, Map<String, Integer> sackData){
         List<Slot> slots = handler.slots;
         InventoryReader.LOGGER.info("Number of slots: " + slots.size());
         int slotsToIterate = slots.size() - 36; // this excludes player inventory, excludes the last 36 slots
@@ -127,7 +128,6 @@ public class SackReader {
                     for (Text line : loreLines) {
                         String l = line.getString();
                         String[] parts = l.split(" ");
-//                        InventoryReader.LOGGER.info("Parts: " + Arrays.toString(parts));
                         if (parts.length < 4) {
                             continue;
                         }
@@ -135,7 +135,6 @@ public class SackReader {
                         if (GEMSTONE_RARITIES.contains(rarity)) {
                             String itemGemstone = rarity.substring(0, rarity.length()-1)  + " " + itemName.substring(0,itemName.length()-1);
                             Integer itemCount = Integer.parseInt(parts[2].trim().replace(",", ""));
-//                            InventoryReader.LOGGER.info("Item: " + itemGemstone + ", Count: " + itemCount);
                             sackData.put(itemGemstone, itemCount);
                         }
                     }
@@ -144,32 +143,6 @@ public class SackReader {
                 }
             }
         }
-        sendDataToServer();
-    }
-
-    public void sendDataToServer() {
-        if (!InventoryReader.serverRunning.get())
-            return;
-            
-        HttpUtil.HTTP_EXECUTOR.submit(() -> {
-            try {
-                HttpClient client = HttpClient.newHttpClient();
-                String jsonInputString = gson.toJson(sackData);
-
-                HttpRequest request = HttpRequest.newBuilder()
-                        .uri(new URI(SERVER_URL))
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(jsonInputString, StandardCharsets.UTF_8))
-                        .build();
-
-                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-                InventoryReader.LOGGER.info("POST Response Code :: " + response.statusCode());
-//            InventoryReader.LOGGER.info("Response Body :: " + response.body());
-
-                sackData.clear();
-            } catch (Exception e) {
-                InventoryReader.LOGGER.error("Failed to send data to server", e);
-            }
-        });
+        RESOURCES_MANAGER.saveData(sackData);
     }
 }
