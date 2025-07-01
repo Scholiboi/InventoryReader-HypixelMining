@@ -30,7 +30,7 @@ public class IrCommandManager implements ClientModInitializer{
                         .setStyle(Style.EMPTY.withColor(Formatting.WHITE)));
                     context.getSource().sendFeedback(Text.literal("- /ir done: Acknowledge reminder")
                         .setStyle(Style.EMPTY.withColor(Formatting.WHITE)));
-                    context.getSource().sendFeedback(Text.literal("- /ir gui: Open Inventory Reader menu")
+                    context.getSource().sendFeedback(Text.literal("- /ir menu: Open Inventory Reader menu")
                         .setStyle(Style.EMPTY.withColor(Formatting.WHITE)));
                     context.getSource().sendFeedback(Text.literal("- /ir widget: Open Widget Customization Menu")
                         .setStyle(Style.EMPTY.withColor(Formatting.WHITE)));
