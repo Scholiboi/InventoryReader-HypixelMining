@@ -298,7 +298,6 @@ public class SandboxWidget {
             return;
         }
         
-        // Safety check to ensure expandedNodes is initialized
         if (expandedNodes == null) {
             expandedNodes = new HashMap<>();
         }
@@ -311,7 +310,10 @@ public class SandboxWidget {
         if (response.messages != null && !response.messages.isEmpty()) {
             messages.add("Craftable -");
             
-            for (Map.Entry<String, Integer> entry : response.messages.entrySet()) {
+            List<Map.Entry<String, Integer>> sortedEntries = new ArrayList<>(response.messages.entrySet());
+            sortedEntries.sort((e1, e2) -> e2.getValue().compareTo(e1.getValue()));
+            
+            for (Map.Entry<String, Integer> entry : sortedEntries) {
                 if (entry.getValue() != null && entry.getValue() > 0) {
                     messages.add("   " + entry.getValue() + "× " + entry.getKey());
                 }
@@ -355,14 +357,25 @@ public class SandboxWidget {
         int panelWidth = 250;
         int visibleLines = countVisibleRecipeTreeLines(recipeTree);
         
-        int messageLines = countMessageLines(client, panelWidth);
-        int messageSectionHeight = messageLines > 0 ? messageLines * 16 + 20 : 0; 
+        int recipeTreeHeight = visibleLines * 16;
         
-        int panelHeight = Math.min(height - 40, 20 + (visibleLines * 16) + messageSectionHeight + 20);
+        int maxTreeHeight = recipeTreeHeight;
+        
+        int messageLines = countMessageLines(client, panelWidth);
+        
+        int availableForMessages = Math.max(0, Math.min((int)(height * 0.4), height - 40 - maxTreeHeight - 30));
+        
+        int messageSectionHeight = messageLines > 0 ? Math.min(messageLines * 10 + 20, availableForMessages) : 0;
+        
+        int panelHeight = Math.min(height - 40, 20 + maxTreeHeight + messageSectionHeight + 15);
+        
         int panelX = widgetX;
         int panelY = widgetY;
+        
         context.fill(panelX, panelY, panelX + panelWidth, panelY + panelHeight, DARK_PANEL_BG);
+        
         context.fill(panelX, panelY, panelX + panelWidth, panelY + 20, HEADER_BG);
+        
         int borderColor = 0xFFDAA520;
         int borderThickness = 2;
         for (int i = 0; i < borderThickness; i++) {
@@ -374,6 +387,7 @@ public class SandboxWidget {
                 borderColor
             );
         }
+        
         Text title = Text.literal("Recipe: " + selectedRecipe)
             .setStyle(Style.EMPTY.withColor(Formatting.GOLD).withBold(true));
         int titleWidth = client.textRenderer.getWidth(title);
@@ -385,6 +399,7 @@ public class SandboxWidget {
             0xFFFFFFFF,
             false
         );
+        
         if (isRepositioning) {
             String repoText = "◆ Click to place widget ◆";
             context.drawText(
@@ -396,20 +411,24 @@ public class SandboxWidget {
                 true
             );
         }
+        
         context.fill(panelX, panelY + 19, panelX + panelWidth, panelY + 20, 0x99608C35);
+        
         int y = panelY + 22;
         
-        int messagesDisplayHeight = 0;
-        if (!messages.isEmpty()) {
-            messagesDisplayHeight = countMessageLines(client, panelWidth) * 16 + 20; // 20px for header and spacing
+        int treeEndY = y + maxTreeHeight;
+        
+        renderRecipeTree(context, recipeTree, panelX, y, 0, treeEndY);
+        
+        if (messageSectionHeight > 0) {
+            context.fill(panelX, treeEndY, panelX + panelWidth, treeEndY + 1, 0x99608C35);
+            
+            int messageY = treeEndY + 6;
+            
+            int maxMessageY = panelY + panelHeight - 5;
+            
+            drawMessages(context, panelX, messageY, panelWidth, maxMessageY);
         }
-
-        int maxRecipeTreeY = panelY + panelHeight - messagesDisplayHeight - 10;
-        
-        int afterTreeY = renderRecipeTree(context, recipeTree, panelX, y, 0, maxRecipeTreeY);
-        
-        int messageY = Math.min(afterTreeY + 5, maxRecipeTreeY);
-        drawMessages(context, panelX, messageY, panelWidth);
     }
     private int countVisibleRecipeTreeLines(RecipeManager.RecipeNode node) {
         if (node == null) return 0;
@@ -512,8 +531,8 @@ public class SandboxWidget {
                 context.fill(lineStartX, vertLineY, lineStartX + 1, vertLineY + 8, lineColor);
                 context.fill(lineStartX, vertLineY + 8, childIndentX, vertLineY + 9, lineColor);
                 int nextY = renderRecipeTree(context, child, x, y, level + 1, maxY);
-                if (nextY > maxY) {
-                    return nextY;
+                if (nextY >= maxY) {
+                    return maxY;
                 }
                 y = nextY;
             }
@@ -546,43 +565,64 @@ public class SandboxWidget {
             }
         }
     }
-    private void drawMessages(DrawContext context, int x, int y, int width) {
+    private void drawMessages(DrawContext context, int x, int y, int width, int maxY) {
         MinecraftClient client = MinecraftClient.getInstance();
         long currentTime = Util.getMeasuringTimeMs();
+        
         if (currentTime - messageDisplayTime <= MESSAGE_DURATION && !messages.isEmpty()) {
-            context.fill(x, y - 5, x + width - 10, y - 4, 0x99608C35);
-            
-            Text messagesHeader = Text.literal("Craftable -")
-                .setStyle(Style.EMPTY.withColor(Formatting.YELLOW).withBold(true));
-            context.drawText(
-                client.textRenderer,
-                messagesHeader,
-                x + 5,
-                y - 3,
-                0xFFFFFFFF,
-                false
-            );
+            if (y + 10 <= maxY) {
+                Text messagesHeader = Text.literal("Craftable -")
+                    .setStyle(Style.EMPTY.withColor(Formatting.YELLOW).withBold(true));
+                context.drawText(
+                    client.textRenderer,
+                    messagesHeader,
+                    x + 5,
+                    y,
+                    0xFFFFFFFF,
+                    false
+                );
+            } else {
+                return;
+            }
             
             if (messages.size() == 1 && messages.get(0).equals("Craftable -")) {
                 return;
             }
             
-            y += 12;
+            y += 13;
             
             List<String> messagesCopy = new ArrayList<>(messages);
+            
+            messagesCopy.sort((a, b) -> {
+                if (a.equals("Craftable -")) return -1;
+                if (b.equals("Craftable -")) return 1;
+                
+                try {
+                    int amountA = extractAmount(a);
+                    int amountB = extractAmount(b);
+                    return Integer.compare(amountB, amountA);
+                } catch (Exception e) {
+                    return 0;
+                }
+            });
+            
             for (int i = 0; i < messagesCopy.size(); i++) {
                 String message = messagesCopy.get(i);
 
-                if (i == 0 && message.equals("Craftable -")) {
+                if (message.equals("Craftable -")) {
                     continue;
                 }
-
+                
                 int textColor = message.startsWith("   ") ? 0xFFFF9D00 : 0xFFFFFFFF;
 
                 String[] words = message.split(" ");
                 StringBuilder line = new StringBuilder();
                 for (String word : words) {
                     if (client.textRenderer.getWidth(line.toString() + word) > width - 15) {
+                        if (y + 10 > maxY) {
+                            return;
+                        }
+                        
                         context.drawText(
                             client.textRenderer,
                             line.toString(),
@@ -597,7 +637,12 @@ public class SandboxWidget {
                         line.append(word).append(" ");
                     }
                 }
+                
                 if (line.length() > 0) {
+                    if (y + 9 > maxY) {
+                        return;
+                    }
+                    
                     context.drawText(
                         client.textRenderer,
                         line.toString(),
@@ -610,6 +655,18 @@ public class SandboxWidget {
                 }
             }
         }
+    }
+    
+    private int extractAmount(String message) {
+        try {
+            int xIndex = message.indexOf('×');
+            if (xIndex > 0) {
+                String amountStr = message.substring(0, xIndex).trim();
+                return Integer.parseInt(amountStr);
+            }
+        } catch (Exception e) {
+        }
+        return 0;
     }
     public void addMessage(String message) {
         this.messages.add(message);
@@ -629,16 +686,18 @@ public class SandboxWidget {
     private int countMessageLines(MinecraftClient client, int width) {
         int lineCount = 0;
         long currentTime = Util.getMeasuringTimeMs();
+        
         if (currentTime - messageDisplayTime <= MESSAGE_DURATION && !messages.isEmpty()) {
+            lineCount = 1;
+            
             if (messages.size() == 1 && messages.get(0).equals("Craftable -")) {
-                return 1;
+                return lineCount;
             }
             
             List<String> messagesCopy = new ArrayList<>(messages);
-            for (int i = 0; i < messagesCopy.size(); i++) {
-                String message = messagesCopy.get(i);
-                
-                if (i == 0 && message.equals("Craftable -")) {
+            
+            for (String message : messagesCopy) {
+                if (message.equals("Craftable -")) {
                     continue;
                 }
                 
