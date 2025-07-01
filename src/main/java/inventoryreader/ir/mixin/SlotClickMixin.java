@@ -7,8 +7,6 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.slot.SlotActionType;
 
-import java.util.Map;
-
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -37,7 +35,7 @@ public abstract class SlotClickMixin {
             return;
         }
         StorageReader storageReader = StorageReader.getInstance();
-        Map<String, java.util.Map<String, Integer>> allcontainerData = storageReader.loadAllContainerDataFromFile();
-        storageReader.compareContainerData((ScreenHandler)(Object)this, title, allcontainerData);
+        // Map<String, java.util.Map<String, Integer>> allcontainerData = storageReader.loadAllContainerDataFromFile();
+        storageReader.saveContainerContents((ScreenHandler)(Object)this, title);
     }
 }

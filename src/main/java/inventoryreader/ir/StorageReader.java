@@ -120,7 +120,7 @@ public class StorageReader {
 
         allcontainerData.put(title, previousData);
         saveAllContainerDataToFile(allcontainerData);
-        RESOURCES_MANAGER.saveData(previousData);
+        RESOURCES_MANAGER.saveData(changesData);
         changesData.clear();
     }
 
