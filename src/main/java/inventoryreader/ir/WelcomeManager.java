@@ -23,9 +23,11 @@ public class WelcomeManager {
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             client.execute(() -> {
                 try {
-                    Thread.sleep(3000);
-                    showWelcomeMessage(client);
-                } catch (InterruptedException e) {
+                    checkFirstTimeUser();
+                    if (isFirstTimeUser) {
+                        showWelcomeMessage(client);
+                    }
+                } catch (Exception e) {
                     Thread.currentThread().interrupt();
                 }
             });
