@@ -204,13 +204,29 @@ public class ResourcesManager {
                             Map<String, Integer> highestPossibleResources, Map<String, Integer> currentAvailableResources, 
                             Map<String, Integer> messages) {
         Map<String, Integer> recipe = forging.get(currentItem);
+        Map<String, Integer> madeResources = new LinkedHashMap<>();
         if (recipe == null) return;
         for (Map.Entry<String, Integer> entry : recipe.entrySet()) {
             String item = entry.getKey();
             int quantity = entry.getValue();
             if (forging.containsKey(item)) {
                 int need = Math.max(0, (quantity * multiplier) - currentAvailableResources.getOrDefault(item, 0));
-                compositeMaterial(item, need, forging, highestPossibleResources, currentAvailableResources, messages);
+                if (need > 0) {
+                    buildRecipe(item, need, forging, highestPossibleResources, currentAvailableResources, messages);
+                    madeResources.put(item, currentAvailableResources.getOrDefault(item, 0));
+                    currentAvailableResources.put(item, 0);
+                }else{
+                    madeResources.put(item, quantity * multiplier);
+                    currentAvailableResources.put(item, currentAvailableResources.getOrDefault(item, 0) - quantity * multiplier);
+                }
+            }
+        }
+        for (Map.Entry<String, Integer> entry : madeResources.entrySet()) {
+            String item = entry.getKey();
+            int quantity = entry.getValue();
+            if (quantity > 0) {
+                currentAvailableResources.put(item, 
+                        currentAvailableResources.getOrDefault(item, 0) + quantity);
             }
         }
         check(currentItem, multiplier, forging, highestPossibleResources, currentAvailableResources, messages);
@@ -279,24 +295,6 @@ public class ResourcesManager {
                        quantityOfBaseItem * amountLeftToAllocate);
             }
         }
-    }
-
-    private void compositeMaterial(String currentItem, int multiplier, Map<String, Map<String, Integer>> forging,
-                                  Map<String, Integer> highestPossibleResources, Map<String, Integer> currentAvailableResources,
-                                  Map<String, Integer> messages) {
-        Map<String, Integer> recipe = forging.get(currentItem);
-        if (recipe == null) return;
-        
-        for (Map.Entry<String, Integer> entry : recipe.entrySet()) {
-            String item = entry.getKey();
-            int quantity = entry.getValue();
-            if (forging.containsKey(item)) {
-                int need = Math.max(0, (quantity * multiplier) - currentAvailableResources.getOrDefault(item, 0));
-                compositeMaterial(item, need, forging, highestPossibleResources, currentAvailableResources, messages);
-            }
-        }
-        
-        check(currentItem, multiplier, forging, highestPossibleResources, currentAvailableResources, messages);
     }
 
     private RecipeNode expandRequiredRecipe(String currentName, int multiplier, Map<String, Map<String, Integer>> forging, Map<String, Integer> highestPossibleResources) {
