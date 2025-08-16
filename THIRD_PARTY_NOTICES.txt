@@ -1,0 +1,6 @@
+Third-Party Notices
+
+NotEnoughUpdates-REPO
+Source: https://github.com/NotEnoughUpdates/NotEnoughUpdates-REPO
+Usage: Recipes and item mapping data are derived from this repository.
+License: See upstream repository for license terms. All rights remain with their respective owners.

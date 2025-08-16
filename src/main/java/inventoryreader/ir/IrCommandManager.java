@@ -34,39 +34,35 @@ public class IrCommandManager implements ClientModInitializer{
                         .setStyle(Style.EMPTY.withColor(Formatting.WHITE)));
                     context.getSource().sendFeedback(Text.literal("- /ir widget: Open Widget Customization Menu")
                         .setStyle(Style.EMPTY.withColor(Formatting.WHITE)));
+                    context.getSource().sendFeedback(Text.literal("- /ir credits: Show credits")
+                        .setStyle(Style.EMPTY.withColor(Formatting.WHITE)));
                     return 1;
                 })
-                
                 .then(literal("reset")
                     .executes(context -> {
                         InventoryReader.LOGGER.info("Executing complete mod reset");
-
                         SendingManager.blockNextDataSend();
-
                         StorageReader.getInstance().clearAllData();
                         FilePathManager.reInitializeFiles();
                         SackReader.setNeedsReminder(true);
-                        
-                        context.getSource().sendFeedback(Text.literal("Inventory Reader data reset! ")
-                            .setStyle(Style.EMPTY.withColor(Formatting.GREEN))
-                            .append(Text.literal("Open a sack or type /ir done to stop reminders.")
-                                .setStyle(Style.EMPTY.withColor(Formatting.YELLOW))));
+                        context.getSource().sendFeedback(
+                            Text.literal("Inventory Reader data reset! ")
+                                .setStyle(Style.EMPTY.withColor(Formatting.GREEN))
+                                .append(Text.literal("Open a sack or type /ir done to stop reminders.")
+                                    .setStyle(Style.EMPTY.withColor(Formatting.YELLOW)))
+                        );
                         return 1;
                     })
                 )
-                
                 .then(literal("done")
                     .executes(context -> {
                         SackReader.setNeedsReminder(false);
-
                         SendingManager.unblockDataSend();
-                        
                         context.getSource().sendFeedback(Text.literal("Acknowledged! Reminders stopped.")
                             .setStyle(Style.EMPTY.withColor(Formatting.GREEN)));
                         return 1;
                     })
                 )
-                
                 .then(literal("menu")
                     .executes(context -> {
                         InventoryReader.LOGGER.info("Opening SandboxViewer GUI (deferred)");
@@ -81,6 +77,22 @@ public class IrCommandManager implements ClientModInitializer{
                 .then(literal("widget")
                     .executes(context -> {
                         inventoryreader.ir.InventoryReaderClient.shouldOpenWidgetCustomization = true;
+                        return 1;
+                    })
+                )
+                .then(literal("credits")
+                    .executes(context -> {
+                        context.getSource().sendFeedback(
+                            Text.literal("Inventory Reader by Scholiboi")
+                                .setStyle(Style.EMPTY.withColor(Formatting.GOLD))
+                        );
+                        context.getSource().sendFeedback(
+                            Text.literal("Data source: NotEnoughUpdates-REPO")
+                                .setStyle(Style.EMPTY.withColor(Formatting.WHITE))
+                                .append(Text.literal(" • "))
+                                .append(Text.literal("https://github.com/NotEnoughUpdates/NotEnoughUpdates-REPO")
+                                    .setStyle(Style.EMPTY.withColor(Formatting.AQUA)))
+                        );
                         return 1;
                     })
                 )

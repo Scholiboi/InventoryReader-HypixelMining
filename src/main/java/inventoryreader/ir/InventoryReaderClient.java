@@ -31,21 +31,35 @@ public class InventoryReaderClient implements ClientModInitializer {
     // private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private static KeyBinding openSandboxViewerKey;
     private static KeyBinding openWidgetCustomizationKey;
+    private static KeyBinding toggleWidgetKey;
+    private static KeyBinding openPositioningHudKey;
     public static boolean shouldOpenSandboxViewer = false;
     public static boolean shouldOpenWidgetCustomization = false;
 
     @Override
     public void onInitializeClient() {
         openSandboxViewerKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-            "key.ir.opensandboxviewer",
+            "Open Sandbox Viewer",
             GLFW.GLFW_KEY_V,
-            "Skyblock Mining Resource Reader"
+            "Skyblock Resource Calculator"
         ));
         
         openWidgetCustomizationKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-            "key.ir.openwidgetcustomization",
+            "Open Widget Customization",
             GLFW.GLFW_KEY_B,
-            "Skyblock Mining Resource Reader"
+            "Skyblock Resource Calculator"
+        ));
+
+        toggleWidgetKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+            "Toggle Widget",
+            GLFW.GLFW_KEY_H,
+            "Skyblock Resource Calculator"
+        ));
+
+        openPositioningHudKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+            "Open Positioning HUD",
+            GLFW.GLFW_KEY_J,
+            "Skyblock Resource Calculator"
         ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -57,6 +71,21 @@ public class InventoryReaderClient implements ClientModInitializer {
             if (openWidgetCustomizationKey.wasPressed() || shouldOpenWidgetCustomization) {
                 client.execute(() -> client.setScreen(new WidgetCustomizationMenu()));
                 shouldOpenWidgetCustomization = false;
+            }
+
+            if (toggleWidgetKey.wasPressed()) {
+                client.execute(() -> {
+                    SandboxWidget widget = SandboxWidget.getInstance();
+                    boolean newState = !widget.isEnabled();
+                    widget.setEnabled(newState);
+                    if (newState) {
+                        // If enabled with a recipe selected previously in SandboxViewer, keep it; else no-op
+                    }
+                });
+            }
+
+            if (openPositioningHudKey.wasPressed()) {
+                client.execute(() -> client.setScreen(new WidgetCustomizationMenu(true)));
             }
             
             if (client.player != null && client.world != null) {

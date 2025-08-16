@@ -362,7 +362,7 @@ public class RecipeFileGenerator {
         forgingRecipes.put("Enchanted Diamond Block", mapOf("Enchanted Diamond", 160));
         forgingRecipes.put("Enchanted Diamond", mapOf("Diamond", 160));
         forgingRecipes.put("Enchanted Mithril", mapOf("Mithril", 160));
-        forgingRecipes.put("Enchanted Titanium", mapOf("Titanium", 16));
+        forgingRecipes.put("Enchanted Titanium", mapOf("Titanium", 160));
         forgingRecipes.put("Enchanted Umber", mapOf("Umber", 160));
         forgingRecipes.put("Enchanted Tungsten", mapOf("Tungsten", 160));
         forgingRecipes.put("Enchanted Iron Block", mapOf("Enchanted Iron", 160));
@@ -382,9 +382,12 @@ public class RecipeFileGenerator {
             new int[]{1, 1, 1, 1, 1, 1}
         ));
 
-        try (FileWriter writer = new FileWriter(FilePathManager.FORGING_JSON)) {
+    try (FileWriter writer = new FileWriter(FilePathManager.FORGING_JSON)) {
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
-            gson.toJson(forgingRecipes, writer);
+            java.util.Map<String, Object> wrapped = new java.util.LinkedHashMap<>();
+            wrapped.put("version", 1);
+            wrapped.put("recipes", forgingRecipes);
+            gson.toJson(wrapped, writer);
             LOGGER.info("Forging recipes file generated successfully");
         } catch (IOException e) {
             LOGGER.error("Failed to generate forging recipes file", e);
@@ -412,9 +415,12 @@ public class RecipeFileGenerator {
             perfect.put("Flawless " + type + " Gemstone", 5);
             gemstoneRecipes.put("Perfect " + type + " Gemstone", perfect);
         }
-        try (FileWriter writer = new FileWriter(FilePathManager.GEMSTONE_RECIPES_JSON)) {
+    try (FileWriter writer = new FileWriter(FilePathManager.GEMSTONE_RECIPES_JSON)) {
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
-            gson.toJson(gemstoneRecipes, writer);
+            java.util.Map<String, Object> wrapped = new java.util.LinkedHashMap<>();
+            wrapped.put("version", 1);
+            wrapped.put("recipes", gemstoneRecipes);
+            gson.toJson(wrapped, writer);
             LOGGER.info("Gemstone recipes file generated successfully");
         } catch (IOException e) {
             LOGGER.error("Failed to generate gemstone recipes file", e);

@@ -10,13 +10,16 @@ import java.io.File;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Collections;
 
 public class ResourcesManager {
 
     private static final ResourcesManager INSTANCE = new ResourcesManager();
-    private static final File resourcesFile = new File(FilePathManager.DATA_DIR, "resources.json");
+    private static final File resourcesFile = FilePathManager.getResourcesFile();
+    private static final Object RES_FILE_LOCK = new Object();
+    private final Map<String, Integer> pendingChanges = new LinkedHashMap<>();
 
     private ResourcesManager() {}
 
@@ -26,42 +29,85 @@ public class ResourcesManager {
 
     private void directSave(Map<String, Integer> resources) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        try (FileWriter writer = new FileWriter(resourcesFile)) {
-            gson.toJson(resources, writer);
-        } catch (IOException e) {
-            e.printStackTrace();
+        synchronized (RES_FILE_LOCK) {
+            atomicWriteJson(resourcesFile, gson.toJson(resources));
         }
     }
 
     public void saveData(Map<String, Integer> data) {
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        Map<String, Integer> resources = new java.util.LinkedHashMap<>();
-        Type type = new TypeToken<Map<String, Integer>>(){}.getType();
-        try (FileReader reader = new FileReader(resourcesFile)) {
-            Map<String, Integer> loaded = gson.fromJson(reader, type);
-            if (loaded != null) {
-                resources.putAll(loaded);
+        if (!FilePathManager.areResourceNamesSeeded()) {
+            synchronized (pendingChanges) {
+                mergeInto(pendingChanges, data);
             }
-        } catch (IOException e) {}
-        for (String item : data.keySet()) {
-            if (item == null || item.isEmpty()) continue;
-            Integer value = data.get(item);
+            return;
+        }
+
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        synchronized (RES_FILE_LOCK) {
+            Map<String, Integer> resources = new java.util.LinkedHashMap<>();
+            Type type = new TypeToken<Map<String, Integer>>(){}.getType();
+            try (FileReader reader = new FileReader(resourcesFile)) {
+                Map<String, Integer> loaded = gson.fromJson(reader, type);
+                if (loaded != null) {
+                    resources.putAll(loaded);
+                }
+            } catch (IOException e) {
+                // ignore: treat as empty
+            }
+            resources.entrySet().removeIf(e -> {
+                String k = e.getKey();
+                return k == null || k.trim().isEmpty() || k.trim().matches("\\d+");
+            });
+            Map<String, Integer> toApply = new LinkedHashMap<>();
+            synchronized (pendingChanges) {
+                if (!pendingChanges.isEmpty()) {
+                    toApply.putAll(pendingChanges);
+                    pendingChanges.clear();
+                }
+            }
+            mergeInto(toApply, data);
+            applyDeltas(resources, toApply);
+            atomicWriteJson(resourcesFile, gson.toJson(resources));
+        }
+    }
+
+    public boolean flushPendingIfReady() {
+        if (!FilePathManager.areResourceNamesSeeded()) return false;
+        Map<String, Integer> snapshot;
+        synchronized (pendingChanges) {
+            if (pendingChanges.isEmpty()) return true;
+            snapshot = new LinkedHashMap<>(pendingChanges);
+            pendingChanges.clear();
+        }
+        saveData(snapshot);
+        return true;
+    }
+
+    private void mergeInto(Map<String, Integer> target, Map<String, Integer> delta) {
+        if (delta == null || delta.isEmpty()) return;
+        for (Map.Entry<String, Integer> e : delta.entrySet()) {
+            String k = e.getKey();
+            if (k == null || k.trim().isEmpty() || k.trim().matches("\\d+")) continue;
+            int v = e.getValue() == null ? 0 : e.getValue();
+            target.put(k, target.getOrDefault(k, 0) + v);
+        }
+    }
+
+    private void applyDeltas(Map<String, Integer> resources, Map<String, Integer> delta) {
+        for (Map.Entry<String, Integer> e : delta.entrySet()) {
+            String item = e.getKey().replace("✪", "").replace("➊", "").replace("➋", "").replace("➌", "").replace("➍", "").replace("➎", "");
+            int value = e.getValue();
             if (resources.containsKey(item)) {
                 resources.put(item, resources.get(item) + value);
             } else {
                 String[] itemSplit = item.split(" ");
                 if (itemSplit.length > 1) {
-                    String itemRefined = String.join(" ", java.util.Arrays.copyOfRange(itemSplit, 1, itemSplit.length));
-                    if (resources.containsKey(itemRefined)) {
+                    String itemRefined = String.join(" ", Arrays.copyOfRange(itemSplit, 1, itemSplit.length));
+                    if (!itemRefined.trim().matches("\\d+") && resources.containsKey(itemRefined)) {
                         resources.put(itemRefined, resources.get(itemRefined) + value);
                     }
                 }
             }
-        }
-        try (FileWriter writer = new FileWriter(resourcesFile)) {
-            gson.toJson(resources, writer);
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
@@ -76,8 +122,39 @@ public class ResourcesManager {
             if (resources != null) {
                 return new LinkedHashMap<>(resources);
             }
-        } catch (IOException | com.google.gson.JsonSyntaxException e) {}
+        } catch (IOException | com.google.gson.JsonSyntaxException e) {
+            // On parse error, return empty snapshot; writes are atomic so this should be rare
+        }
         return new LinkedHashMap<>();
+    }
+
+    // Write JSON via a temp file then atomically move into place to avoid partial reads
+    private void atomicWriteJson(File target, String json) {
+        try {
+            File dir = target.getParentFile();
+            if (dir != null && !dir.exists()) dir.mkdirs();
+            File tmp = File.createTempFile(target.getName(), ".tmp", dir);
+            try (FileWriter writer = new FileWriter(tmp)) {
+                writer.write(json);
+            }
+            try {
+                java.nio.file.Files.move(
+                    tmp.toPath(),
+                    target.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                    java.nio.file.StandardCopyOption.ATOMIC_MOVE
+                );
+            } catch (IOException atomicFail) {
+                // Fallback if filesystem doesn't support ATOMIC_MOVE
+                java.nio.file.Files.move(
+                    tmp.toPath(),
+                    target.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                );
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public Integer getResourceByName(String name) {

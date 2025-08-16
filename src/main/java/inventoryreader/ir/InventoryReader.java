@@ -16,7 +16,7 @@ public class InventoryReader implements ModInitializer{
 
     @Override
     public void onInitialize() {
-        LOGGER.info("Skyblock Mining Resource Reader Mod initializing...");
+        LOGGER.info("Skyblock Resource Calculator Mod initializing...");
         cleanupLegacyFiles();
         FilePathManager.initializeDirectories();
     }

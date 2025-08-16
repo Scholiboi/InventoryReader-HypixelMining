@@ -10,7 +10,6 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.Util;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -32,14 +31,16 @@ public class SandboxWidget {
     private RecipeManager.RecipeNode recipeTree = null;
     private int widgetX = 10;
     private int widgetY = 40;
+    private int widgetWidth = 250;
+    private int widgetHeight = 300;
     private boolean isRepositioning = false;
     private Map<String, Boolean> expandedNodes = new HashMap<>();
     private final List<String> messages = new CopyOnWriteArrayList<>();
-    private long messageDisplayTime = 0;
-    private static final long MESSAGE_DURATION = 5000;
     private int craftAmount = 1;
     private final ResourcesManager resourcesManager;
     private final ScheduledExecutorService scheduler;
+    private int currentNodeLineHeight = 16;
+    private float currentTreeScale = 1.0f;
 
     private SandboxWidget() {
         this.resourcesManager = ResourcesManager.getInstance();
@@ -61,8 +62,11 @@ public class SandboxWidget {
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
         if (!enabled) {
-            this.selectedRecipe = null;
             this.recipeTree = null;
+        } else {
+            if (this.selectedRecipe != null && !this.selectedRecipe.isEmpty()) {
+                updateRecipeData();
+            }
         }
         saveConfiguration();
     }
@@ -89,6 +93,16 @@ public class SandboxWidget {
     public void setWidgetPosition(int x, int y) {
         this.widgetX = x;
         this.widgetY = y;
+        saveConfiguration();
+    }
+    public int getWidgetWidth() { return widgetWidth; }
+    public int getWidgetHeight() { return widgetHeight; }
+    public void setWidgetSize(int width, int height) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        int screenW = client.getWindow().getScaledWidth();
+        int screenH = client.getWindow().getScaledHeight();
+        this.widgetWidth = Math.max(180, Math.min(width, screenW - 20));
+        this.widgetHeight = Math.max(120, Math.min(height, screenH - 20));
         saveConfiguration();
     }
     public static String getNodeKey(RecipeManager.RecipeNode node) {
@@ -128,6 +142,8 @@ public class SandboxWidget {
                 selectedRecipe,
                 widgetX,
                 widgetY,
+                widgetWidth,
+                widgetHeight,
                 expandedNodes,
                 craftAmount
             );
@@ -160,6 +176,8 @@ public class SandboxWidget {
                     if (config.craftAmount > 0) {
                         this.craftAmount = config.craftAmount;
                     }
+                    if (config.widgetWidth > 0) this.widgetWidth = config.widgetWidth;
+                    if (config.widgetHeight > 0) this.widgetHeight = config.widgetHeight;
                     InventoryReader.LOGGER.info("Widget configuration loaded");
                     if (selectedRecipe != null) {
                         updateRecipeData();
@@ -175,14 +193,18 @@ public class SandboxWidget {
         String selectedRecipe;
         int widgetX;
         int widgetY;
+    int widgetWidth;
+    int widgetHeight;
         Map<String, Boolean> expandedNodes;
         int craftAmount;
-        public WidgetConfig(boolean enabled, String selectedRecipe, int widgetX, int widgetY, 
-                            Map<String, Boolean> expandedNodes, int craftAmount) {
+    public WidgetConfig(boolean enabled, String selectedRecipe, int widgetX, int widgetY, int widgetWidth, int widgetHeight,
+                Map<String, Boolean> expandedNodes, int craftAmount) {
             this.enabled = enabled;
             this.selectedRecipe = selectedRecipe;
             this.widgetX = widgetX;
             this.widgetY = widgetY;
+        this.widgetWidth = widgetWidth;
+        this.widgetHeight = widgetHeight;
             this.expandedNodes = expandedNodes;
             this.craftAmount = craftAmount;
         }
@@ -234,24 +256,25 @@ public class SandboxWidget {
         return false;
     }
     private boolean handleTreeNodeClick(double mouseX, double mouseY) {
-        int panelWidth = 250;
+        int panelWidth = widgetWidth;
         int panelX = widgetX;
         int panelY = widgetY;
         if (mouseX < panelX || mouseX > panelX + panelWidth) {
             return false;
         }
         int y = panelY + 20;
-        return checkNodeClick(recipeTree, mouseX, mouseY, panelX, y, 0);
+        return checkNodeClick(recipeTree, mouseX, mouseY, panelX, y, 0, selectedRecipe);
     }
-    private boolean checkNodeClick(RecipeManager.RecipeNode node, double mouseX, double mouseY, int x, int y, int level) {
+    private boolean checkNodeClick(RecipeManager.RecipeNode node, double mouseX, double mouseY, int x, int y, int level, String pathKey) {
         if (node == null) return false;
-        int indent = level * RECIPE_LEVEL_INDENT;
-        int nodeHeight = 16;
+    int unitIndent = Math.max(4, Math.round(RECIPE_LEVEL_INDENT * currentTreeScale));
+    int indent = level * unitIndent;
+    int nodeHeight = Math.max(6, currentNodeLineHeight);
         boolean hasChildren = node.ingredients != null && !node.ingredients.isEmpty();
-        int nodeWidth = 230 - indent;
+        int nodeWidth = Math.max(100, widgetWidth - 20) - indent;
         if (mouseY >= y && mouseY <= y + nodeHeight) {
             if (mouseX >= x + indent && mouseX <= x + indent + nodeWidth) {
-                String nodeKey = getNodeKey(node);
+                String nodeKey = makePathKey(pathKey, node.name);
                 if (hasChildren) {
                     boolean expanded = expandedNodes.getOrDefault(nodeKey, false);
                     expandedNodes.put(nodeKey, !expanded);
@@ -272,22 +295,22 @@ public class SandboxWidget {
             }
         }
         y += nodeHeight;
-        if (hasChildren && expandedNodes.getOrDefault(getNodeKey(node), false)) {
+    if (hasChildren && expandedNodes.getOrDefault(makePathKey(pathKey, node.name), false)) {
             for (RecipeManager.RecipeNode child : node.ingredients) {
-                boolean childClicked = checkNodeClick(child, mouseX, mouseY, x, y, level + 1);
+        boolean childClicked = checkNodeClick(child, mouseX, mouseY, x, y, level + 1, makePathKey(pathKey, node.name));
                 if (childClicked) return true;
-                y += getExpandedNodeHeight(child);
+        y += getExpandedNodeHeight(child, makePathKey(pathKey, node.name)) * Math.max(6, currentNodeLineHeight) / 16;
             }
         }
         return false;
     }
-    private int getExpandedNodeHeight(RecipeManager.RecipeNode node) {
+    private int getExpandedNodeHeight(RecipeManager.RecipeNode node, String pathKey) {
         if (node == null) return 0;
         int height = 16;
         if (node.ingredients != null && !node.ingredients.isEmpty() && 
-            expandedNodes.getOrDefault(getNodeKey(node), false)) {
-            for (RecipeManager.RecipeNode child : node.ingredients) {
-                height += getExpandedNodeHeight(child);
+        expandedNodes.getOrDefault(makePathKey(pathKey, node.name), false)) {
+        for (RecipeManager.RecipeNode child : node.ingredients) {
+        height += getExpandedNodeHeight(child, makePathKey(pathKey, node.name));
             }
         }
         return height;
@@ -320,7 +343,7 @@ public class SandboxWidget {
             }
         }
         
-        messageDisplayTime = Util.getMeasuringTimeMs();
+        
         
         recipeTree = convertResourceNodeToRecipeNode(response.full_recipe);
         boolean craftable = false;
@@ -352,27 +375,32 @@ public class SandboxWidget {
         if (!enabled || selectedRecipe == null || recipeTree == null) {
             return;
         }
-        MinecraftClient client = MinecraftClient.getInstance();
-        int height = client.getWindow().getScaledHeight();
-        int panelWidth = 250;
-        int visibleLines = countVisibleRecipeTreeLines(recipeTree);
-        
-        int recipeTreeHeight = visibleLines * 16;
-        
-        int maxTreeHeight = recipeTreeHeight;
-        
-        int messageLines = countMessageLines(client, panelWidth);
-        
-        int availableForMessages = Math.max(0, Math.min((int)(height * 0.4), height - 40 - maxTreeHeight - 30));
-        
-        int messageSectionHeight = messageLines > 0 ? Math.min(messageLines * 10 + 20, availableForMessages) : 0;
-        
-        int panelHeight = Math.min(height - 40, 20 + maxTreeHeight + messageSectionHeight + 15);
+    MinecraftClient client = MinecraftClient.getInstance();
+    int height = client.getWindow().getScaledHeight();
+    int panelWidth = widgetWidth;
+    int visibleLines = countVisibleRecipeTreeLines(recipeTree, selectedRecipe);
+    int panelMaxHeight = Math.min(height - 40, widgetHeight);
+
+    int recipeTreeHeightMax = Math.max(0, visibleLines * 16);
+    int messageLinesRaw = countMessageLines(client, panelWidth);
+    int availableForMessagesMax = Math.max(0, Math.min((int)(height * 0.4), panelMaxHeight - 20 - recipeTreeHeightMax - 15));
+    int messageSectionHeightEst = messageLinesRaw > 0 ? Math.min(messageLinesRaw * 10 + 20, availableForMessagesMax) : 0;
+
+    int availableTreeHeight1 = Math.max(0, panelMaxHeight - 22 - (messageSectionHeightEst > 0 ? (messageSectionHeightEst + 15) : 0));
+    int safeLines = Math.max(1, visibleLines);
+    int computedLine1 = safeLines > 0 ? Math.max(6, (int)Math.floor((float)availableTreeHeight1 / (float)safeLines)) : 16;
+    computedLine1 = Math.min(16, computedLine1);
+    int treeHeightActual = safeLines * computedLine1;
+
+    int availableForMessages2 = Math.max(0, Math.min((int)(height * 0.4), panelMaxHeight - 20 - treeHeightActual - 15));
+    int messageSectionHeight = messageLinesRaw > 0 ? Math.min(messageLinesRaw * 10 + 20, availableForMessages2) : 0;
+    int desiredPanelHeight = 20 + treeHeightActual + messageSectionHeight + 15;
+    int panelHeight = Math.min(panelMaxHeight, desiredPanelHeight);
         
         int panelX = widgetX;
         int panelY = widgetY;
         
-        context.fill(panelX, panelY, panelX + panelWidth, panelY + panelHeight, DARK_PANEL_BG);
+    context.fill(panelX, panelY, panelX + panelWidth, panelY + panelHeight, DARK_PANEL_BG);
         
         context.fill(panelX, panelY, panelX + panelWidth, panelY + 20, HEADER_BG);
         
@@ -391,14 +419,20 @@ public class SandboxWidget {
         Text title = Text.literal("Recipe: " + selectedRecipe)
             .setStyle(Style.EMPTY.withColor(Formatting.GOLD).withBold(true));
         int titleWidth = client.textRenderer.getWidth(title);
+        int maxTitleWidth = Math.max(20, panelWidth - 10);
+        float titleScale = titleWidth > maxTitleWidth ? (float)maxTitleWidth / (float)titleWidth : 1.0f;
+        context.getMatrices().push();
+        context.getMatrices().translate(panelX + (panelWidth - Math.min(titleWidth, maxTitleWidth)) / 2f, panelY + 5, 0);
+        context.getMatrices().scale(titleScale, titleScale, 1);
         context.drawText(
             client.textRenderer,
             title,
-            panelX + (panelWidth - titleWidth) / 2,
-            panelY + 5,
+            0,
+            0,
             0xFFFFFFFF,
             false
         );
+        context.getMatrices().pop();
         
         if (isRepositioning) {
             String repoText = "◆ Click to place widget ◆";
@@ -414,11 +448,13 @@ public class SandboxWidget {
         
         context.fill(panelX, panelY + 19, panelX + panelWidth, panelY + 20, 0x99608C35);
         
-        int y = panelY + 22;
-        
-        int treeEndY = y + maxTreeHeight;
-        
-        renderRecipeTree(context, recipeTree, panelX, y, 0, treeEndY);
+    int y = panelY + 22;
+    int availableTreeHeight = Math.max(0, panelHeight - 22 - (messageSectionHeight > 0 ? (messageSectionHeight + 15) : 0));
+    int computedLine = safeLines > 0 ? Math.max(6, (int)Math.floor((float)availableTreeHeight / (float)safeLines)) : 16;
+    computedLine = Math.min(16, computedLine);
+    currentNodeLineHeight = computedLine;
+    currentTreeScale = currentNodeLineHeight / 16.0f;
+    int treeEndY = renderRecipeTree(context, recipeTree, panelX, y, 0, selectedRecipe);
         
         if (messageSectionHeight > 0) {
             context.fill(panelX, treeEndY, panelX + panelWidth, treeEndY + 1, 0x99608C35);
@@ -430,7 +466,7 @@ public class SandboxWidget {
             drawMessages(context, panelX, messageY, panelWidth, maxMessageY);
         }
     }
-    private int countVisibleRecipeTreeLines(RecipeManager.RecipeNode node) {
+    private int countVisibleRecipeTreeLines(RecipeManager.RecipeNode node, String pathKey) {
         if (node == null) return 0;
         int count = 1;
         
@@ -438,7 +474,8 @@ public class SandboxWidget {
             expandedNodes = new HashMap<>();
         }
         
-        String nodeKey = getNodeKey(node);
+        // Use path-based key to keep expansion stable regardless of amounts
+        String nodeKey = makePathKey(pathKey, node.name);
         Boolean isExpanded = expandedNodes.getOrDefault(nodeKey, false);
         
         if (isExpanded == null) {
@@ -448,41 +485,44 @@ public class SandboxWidget {
         
         if (node.ingredients != null && !node.ingredients.isEmpty() && isExpanded) {
             for (RecipeManager.RecipeNode child : node.ingredients) {
-                count += countVisibleRecipeTreeLines(child);
+                count += countVisibleRecipeTreeLines(child, makePathKey(pathKey, node.name));
             }
         }
         return count;
     }
-    private int renderRecipeTree(DrawContext context, RecipeManager.RecipeNode node, int x, int y, int level, int maxY) {
+    private int renderRecipeTree(DrawContext context, RecipeManager.RecipeNode node, int x, int y, int level, String pathKey) {
         if (node == null) return y;
         MinecraftClient client = MinecraftClient.getInstance();
-        int indent = level * RECIPE_LEVEL_INDENT;
+        int unitIndent = Math.max(4, Math.round(RECIPE_LEVEL_INDENT * currentTreeScale));
+        int indent = level * unitIndent;
         boolean hasEnough = (node.amount == 0);
-        String nodeKey = getNodeKey(node);
+        String nodeKey = makePathKey(pathKey, node.name);
         boolean isExpanded = expandedNodes.getOrDefault(nodeKey, false);
         boolean hasChildren = node.ingredients != null && !node.ingredients.isEmpty();
         int bgColor = 0x99271910;
         int mouseX = (int)(client.mouse.getX() / client.getWindow().getScaleFactor());
         int mouseY = (int)(client.mouse.getY() / client.getWindow().getScaleFactor());
-        boolean isHovered = mouseX >= x + indent && mouseX <= x + indent + 230 - indent && 
-                            mouseY >= y && mouseY <= y + 16;
+        int nodeBaseWidth = Math.max(100, widgetWidth - 20); // account for panel padding
+        int nodeHeight = Math.max(6, currentNodeLineHeight);
+        boolean isHovered = mouseX >= x + indent && mouseX <= x + indent + nodeBaseWidth - indent && 
+                            mouseY >= y && mouseY <= y + nodeHeight;
         int hoverEffect = isHovered ? 0x22FFFFFF : 0;
-        int nodeWidth = 230 - indent;
-        context.fill(x + indent, y, x + indent + nodeWidth, y + 16, bgColor + hoverEffect);
+        int nodeWidth = nodeBaseWidth - indent;
+        context.fill(x + indent, y, x + indent + nodeWidth, y + nodeHeight, bgColor + hoverEffect);
         int borderColor = hasEnough ? 0x88608C35 : 0x88FF5555;
-        context.drawBorder(x + indent, y, nodeWidth, 16, borderColor);
+        context.drawBorder(x + indent, y, nodeWidth, nodeHeight, borderColor);
         if (hasChildren) {
-            String expandIcon = isExpanded ? "▼" : "►";
+            String expandIcon = isExpanded ? "▼" : "▶";
             context.drawText(
                 client.textRenderer,
                 expandIcon,
-                x + indent + 5,
-                y + 4,
+                x + indent + Math.max(3, Math.round(5 * currentTreeScale)),
+                y + Math.max(1, Math.round(4 * currentTreeScale)),
                 0xFFFFFFFF,
                 false
             );
         }
-        int nameX = x + indent + (hasChildren ? 25 : 10);
+    int nameX = x + indent + (hasChildren ? Math.max(14, Math.round(25 * currentTreeScale)) : Math.max(6, Math.round(10 * currentTreeScale)));
         int textColor;
         boolean isBold = (level == 0);
         if (level == 0) {
@@ -490,50 +530,49 @@ public class SandboxWidget {
         } else {
             textColor = hasEnough ? 0xFFFFFFFF : 0xFFFF6B6B;
         }
-        String prefix = "";
-        String amountText = node.amount + "×";
+        String amountText = node.amount + "× ";
         int amountColor = hasEnough ? 0xFF6EFF6E : 0xFFFF6B6B;
-        context.drawText(
-            client.textRenderer,
-            prefix,
-            nameX,
-            y + 4,
-            0xFFFFFFFF,
-            false
-        );
+        Text itemName = Text.literal(node.name)
+            .setStyle(Style.EMPTY.withColor(textColor).withBold(isBold));
+    int amountWidth = client.textRenderer.getWidth(amountText);
+    int itemWidth = client.textRenderer.getWidth(itemName);
+    int totalTextWidth = amountWidth + itemWidth;
+        int maxTextWidth = Math.max(10, nodeWidth - (hasChildren ? Math.max(14, Math.round(25 * currentTreeScale)) : Math.max(6, Math.round(10 * currentTreeScale))));
+        int adjustedMaxTextWidth = (int)Math.floor(maxTextWidth / Math.max(0.01f, currentTreeScale));
+        float textScaleLocal = totalTextWidth > adjustedMaxTextWidth ? (float)adjustedMaxTextWidth / (float)totalTextWidth : 1.0f;
+        float textScale = Math.min(1.0f, textScaleLocal) * currentTreeScale;
+        context.getMatrices().push();
+        context.getMatrices().translate(nameX, y + Math.max(1, Math.round(4 * currentTreeScale)), 0);
+        context.getMatrices().scale(textScale, textScale, 1);
         context.drawText(
             client.textRenderer,
             amountText,
-            nameX + client.textRenderer.getWidth(prefix),
-            y + 4,
+            0,
+            0,
             amountColor,
             false
         );
-        Text itemName = Text.literal(node.name)
-            .setStyle(Style.EMPTY.withColor(textColor)
-            .withBold(isBold));
         context.drawText(
             client.textRenderer,
             itemName,
-            nameX + client.textRenderer.getWidth(prefix + amountText + " "),
-            y + 4,
+            amountWidth,
+            0,
             0xFFFFFFFF,
             false
         );
-        y += 16;
-        if (hasChildren && isExpanded && node.ingredients.size() > 0) {
+        context.getMatrices().pop();
+        y += nodeHeight;
+    if (hasChildren && isExpanded && node.ingredients.size() > 0) {
             int lineColor = 0xFF777777;
             for (int i = 0; i < node.ingredients.size(); i++) {
                 RecipeManager.RecipeNode child = node.ingredients.get(i);
-                int lineStartX = x + indent + 6;
+                int lineStartX = x + indent + Math.max(4, Math.round(6 * currentTreeScale));
                 int vertLineY = y;
-                int childIndentX = x + indent + RECIPE_LEVEL_INDENT;
-                context.fill(lineStartX, vertLineY, lineStartX + 1, vertLineY + 8, lineColor);
-                context.fill(lineStartX, vertLineY + 8, childIndentX, vertLineY + 9, lineColor);
-                int nextY = renderRecipeTree(context, child, x, y, level + 1, maxY);
-                if (nextY >= maxY) {
-                    return maxY;
-                }
+                int childIndentX = x + indent + unitIndent;
+                int vertLen = Math.max(3, Math.round(8 * currentTreeScale));
+                context.fill(lineStartX, vertLineY, lineStartX + 1, vertLineY + vertLen, lineColor);
+                context.fill(lineStartX, vertLineY + vertLen, childIndentX, vertLineY + vertLen + 1, lineColor);
+        int nextY = renderRecipeTree(context, child, x, y, level + 1, nodeKey);
                 y = nextY;
             }
         }
@@ -546,18 +585,10 @@ public class SandboxWidget {
             expandedNodes = new HashMap<>();
         }
         
-        String nodeKey = getNodeKey(node);
-        if (prevStates != null && prevStates.containsKey(nodeKey)) {
+    String nodeKey = makePathKey(selectedRecipe, node.name);
+    if (prevStates != null && prevStates.containsKey(nodeKey)) {
             Boolean value = prevStates.get(nodeKey);
             expandedNodes.put(nodeKey, value != null ? value : false);
-        } else if (prevStates != null) {
-            for (Map.Entry<String, Boolean> entry : prevStates.entrySet()) {
-                if (entry.getKey() != null && entry.getKey().startsWith(node.name + "_")) {
-                    Boolean value = entry.getValue();
-                    expandedNodes.put(nodeKey, value != null ? value : false);
-                    break;
-                }
-            }
         }
         if (node.ingredients != null) {
             for (RecipeManager.RecipeNode child : node.ingredients) {
@@ -567,92 +598,92 @@ public class SandboxWidget {
     }
     private void drawMessages(DrawContext context, int x, int y, int width, int maxY) {
         MinecraftClient client = MinecraftClient.getInstance();
-        long currentTime = Util.getMeasuringTimeMs();
-        
-        if (currentTime - messageDisplayTime <= MESSAGE_DURATION && !messages.isEmpty()) {
-            if (y + 10 <= maxY) {
-                Text messagesHeader = Text.literal("Craftable -")
-                    .setStyle(Style.EMPTY.withColor(Formatting.YELLOW).withBold(true));
-                context.drawText(
-                    client.textRenderer,
-                    messagesHeader,
-                    x + 5,
-                    y,
-                    0xFFFFFFFF,
-                    false
-                );
-            } else {
-                return;
-            }
-            
-            if (messages.size() == 1 && messages.get(0).equals("Craftable -")) {
-                return;
-            }
-            
-            y += 13;
-            
-            List<String> messagesCopy = new ArrayList<>(messages);
-            
-            messagesCopy.sort((a, b) -> {
-                if (a.equals("Craftable -")) return -1;
-                if (b.equals("Craftable -")) return 1;
-                
-                try {
-                    int amountA = extractAmount(a);
-                    int amountB = extractAmount(b);
-                    return Integer.compare(amountB, amountA);
-                } catch (Exception e) {
-                    return 0;
-                }
-            });
-            
-            for (int i = 0; i < messagesCopy.size(); i++) {
-                String message = messagesCopy.get(i);
+        int baseHeader = 13;
+        int baseLine = 10;
+        int availableHeight = Math.max(0, maxY - y);
+        int lines = countMessageLines(client, width);
+        int desiredHeight = baseHeader + Math.max(0, (lines - 1) * baseLine);
+        float scale = desiredHeight > 0 ? Math.min(1.0f, Math.max(0.4f, (float)availableHeight / (float)desiredHeight)) : 1.0f;
 
-                if (message.equals("Craftable -")) {
-                    continue;
-                }
-                
-                int textColor = message.startsWith("   ") ? 0xFFFF9D00 : 0xFFFFFFFF;
+        if (y + Math.round(baseLine * scale) <= maxY) {
+            Text messagesHeader = Text.literal("Craftable -")
+                .setStyle(Style.EMPTY.withColor(Formatting.YELLOW).withBold(true));
+            context.getMatrices().push();
+            context.getMatrices().translate(x + 5, y, 0);
+            context.getMatrices().scale(scale, scale, 1);
+            context.drawText(
+                client.textRenderer,
+                messagesHeader,
+                0,
+                0,
+                0xFFFFFFFF,
+                false
+            );
+            context.getMatrices().pop();
+        } else {
+            return;
+        }
 
-                String[] words = message.split(" ");
-                StringBuilder line = new StringBuilder();
-                for (String word : words) {
-                    if (client.textRenderer.getWidth(line.toString() + word) > width - 15) {
-                        if (y + 10 > maxY) {
-                            return;
-                        }
-                        
-                        context.drawText(
-                            client.textRenderer,
-                            line.toString(),
-                            x + 5,
-                            y,
-                            textColor,
-                            false
-                        );
-                        y += 10;
-                        line = new StringBuilder(message.startsWith("   ") ? "      " : "   ").append(word).append(" ");
-                    } else {
-                        line.append(word).append(" ");
-                    }
-                }
-                
-                if (line.length() > 0) {
-                    if (y + 9 > maxY) {
-                        return;
-                    }
-                    
+        if (messages.size() == 1 && messages.get(0).equals("Craftable -")) {
+            return;
+        }
+        y += Math.round(baseHeader * scale);
+
+        List<String> messagesCopy = new ArrayList<>(messages);
+        messagesCopy.sort((a, b) -> {
+            if (a.equals("Craftable -")) return -1;
+            if (b.equals("Craftable -")) return 1;
+            try {
+                int amountA = extractAmount(a);
+                int amountB = extractAmount(b);
+                return Integer.compare(amountB, amountA);
+            } catch (Exception e) {
+                return 0;
+            }
+        });
+
+        int unscaledWrapWidth = Math.max(10, (int)Math.floor((width - 15) / Math.max(0.01f, scale)));
+        for (String message : messagesCopy) {
+            if (message.equals("Craftable -")) continue;
+            int textColor = message.startsWith("   ") ? 0xFFFF9D00 : 0xFFFFFFFF;
+            String[] words = message.split(" ");
+            StringBuilder line = new StringBuilder();
+            for (String word : words) {
+                if (client.textRenderer.getWidth(line.toString() + word) > unscaledWrapWidth) {
+                    if (y + Math.round(baseLine * scale) > maxY) return;
+                    context.getMatrices().push();
+                    context.getMatrices().translate(x + 5, y, 0);
+                    context.getMatrices().scale(scale, scale, 1);
                     context.drawText(
                         client.textRenderer,
                         line.toString(),
-                        x + 5,
-                        y,
+                        0,
+                        0,
                         textColor,
                         false
                     );
-                    y += 9;
+                    context.getMatrices().pop();
+                    y += Math.round(baseLine * scale);
+                    line = new StringBuilder(message.startsWith("   ") ? "      " : "   ").append(word).append(" ");
+                } else {
+                    line.append(word).append(" ");
                 }
+            }
+            if (line.length() > 0) {
+                if (y + Math.round((baseLine - 1) * scale) > maxY) return;
+                context.getMatrices().push();
+                context.getMatrices().translate(x + 5, y, 0);
+                context.getMatrices().scale(scale, scale, 1);
+                context.drawText(
+                    client.textRenderer,
+                    line.toString(),
+                    0,
+                    0,
+                    textColor,
+                    false
+                );
+                context.getMatrices().pop();
+                y += Math.round((baseLine - 1) * scale);
             }
         }
     }
@@ -670,7 +701,9 @@ public class SandboxWidget {
     }
     public void addMessage(String message) {
         this.messages.add(message);
-        this.messageDisplayTime = Util.getMeasuringTimeMs();
+    }
+    public List<String> getMessagesSnapshot() {
+        return new ArrayList<>(this.messages);
     }
     public int getCraftAmount() {
         return craftAmount;
@@ -684,38 +717,30 @@ public class SandboxWidget {
         saveConfiguration();
     }
     private int countMessageLines(MinecraftClient client, int width) {
-        int lineCount = 0;
-        long currentTime = Util.getMeasuringTimeMs();
-        
-        if (currentTime - messageDisplayTime <= MESSAGE_DURATION && !messages.isEmpty()) {
-            lineCount = 1;
-            
-            if (messages.size() == 1 && messages.get(0).equals("Craftable -")) {
-                return lineCount;
-            }
-            
-            List<String> messagesCopy = new ArrayList<>(messages);
-            
-            for (String message : messagesCopy) {
-                if (message.equals("Craftable -")) {
-                    continue;
+        int lineCount = 1;
+        if (messages.isEmpty()) return lineCount;
+        if (messages.size() == 1 && messages.get(0).equals("Craftable -")) return lineCount;
+        for (String message : new ArrayList<>(messages)) {
+            if (message.equals("Craftable -")) continue;
+            String[] words = message.split(" ");
+            StringBuilder line = new StringBuilder();
+            int linesInMessage = 1;
+            for (String word : words) {
+                if (client.textRenderer.getWidth(line.toString() + word) > width - 15) {
+                    linesInMessage++;
+                    line = new StringBuilder(message.startsWith("   ") ? "      " : "   ").append(word).append(" ");
+                } else {
+                    line.append(word).append(" ");
                 }
-                
-                String[] words = message.split(" ");
-                StringBuilder line = new StringBuilder();
-                int linesInMessage = 1;
-                
-                for (String word : words) {
-                    if (client.textRenderer.getWidth(line.toString() + word) > width - 15) {
-                        linesInMessage++;
-                        line = new StringBuilder(message.startsWith("   ") ? "      " : "   ").append(word).append(" ");
-                    } else {
-                        line.append(word).append(" ");
-                    }
-                }
-                lineCount += linesInMessage;
             }
+            lineCount += linesInMessage;
         }
         return lineCount;
+    }
+
+    public static String makePathKey(String parent, String name) {
+        if (parent == null || parent.isEmpty()) return name == null ? "" : name;
+        if (name == null || name.isEmpty()) return parent;
+        return parent + ">" + name;
     }
 }

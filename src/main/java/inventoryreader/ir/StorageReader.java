@@ -55,7 +55,7 @@ public class StorageReader {
     public void saveContainerContents(ScreenHandler handler, String title) {
         Map<String, Map<String, Integer>> fileSaveContainerData = loadAllContainerDataFromFile();
 
-        if (!title.contains("Backpack") && !title.contains("Ender Chest") && !title.contains("The Forge")) {
+        if (!title.contains("Backpack") && !title.contains("Ender Chest") && !title.contains("The Forge") && !title.contains("Accessory Bag")) {
             return;
         }
 

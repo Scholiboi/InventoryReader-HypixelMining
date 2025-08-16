@@ -3,18 +3,23 @@
 	"id": "ir",
 	"version": "${version}",
 	"name": "InventoryReader",
-	"description": "Skyblock Mining Inventory Reader! Reads a count of items in your inventory! Access at http://localhost:5000",
+	"description": "Skyblock Mining Inventory Reader! Reads a count of items in your inventory.",
 	"authors": [
 		"Scholiboi"
 	],
 	"contact": {
-		"homepage": "https://github.com/Scholiboi/hypixel-forge",
-		"sources": "https://github.com/Scholiboi/hypixel-forge",
-		"issues": "https://github.com/Scholiboi/hypixel-forge/issues"
+		"homepage": "https://github.com/Scholiboi/InventoryReader-HypixelMining",
+		"sources": "https://github.com/Scholiboi/InventoryReader-HypixelMining",
+		"issues": "https://github.com/Scholiboi/InventoryReader-HypixelMining/issues",
+		"upstreamData": "https://github.com/NotEnoughUpdates/NotEnoughUpdates-REPO"
 	},
 	"license": "MIT",
 	"icon": "assets/ir/icon.png",
 	"environment": "client",
+	"contributors": [
+		"NotEnoughUpdates-REPO (data source)",
+		"Scholiboi (author)"
+	],
 	"entrypoints": {
   		"main": [
     		"inventoryreader.ir.InventoryReader"

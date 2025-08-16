@@ -44,7 +44,7 @@ public class WelcomeManager {
         String divider = "§6§l" + "=".repeat(40);
         
         client.player.sendMessage(Text.literal(divider), false);
-        client.player.sendMessage(Text.literal("§b§lSkyblock Mining Resource Reader").setStyle(
+        client.player.sendMessage(Text.literal("§b§lSkyblock Resource Calculator").setStyle(
             Style.EMPTY.withBold(true).withColor(Formatting.AQUA)
         ), false);
         
